@@ -1,0 +1,16 @@
+{
+    "name": "jack-compiler",
+    "version": "0.0.1",
+    "description": "Compiler for Jack programming language",
+    "main": "index.js",
+    "scripts": {
+        "build-tsc": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "norberts.jegers@gmail.com",
+    "license": "ISC",
+    "dependencies": {
+        "prettier": "^2.4.1",
+        "typescript": "^4.4.3"
+    }
+}

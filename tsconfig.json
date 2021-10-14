@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "lib": ["dom", "es6", "es7"],
+        "target": "es6",
+        "outDir": "build"
+    },
+    "include": ["src/**/*"]
+}
