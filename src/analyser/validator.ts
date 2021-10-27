@@ -1,32 +1,27 @@
 import Token from './token';
+import { TYPES } from './defines';
 
 export default class Validator {
-    public static validateClassKeyword(token: Token): void {
-        if (token.type !== 'KEYWORD' && token.value !== 'class') {
-            Validator.throwError('Keyword "class"', token);
+    public static validateIdentifier(token: Token): void {
+        if (token.type !== 'IDENTIFIER') {
+            Validator.throwError('Identifier', token);
         }
     }
 
-    public static validateClassVarScope(token: Token): void {
-        if (token.type !== 'KEYWORD' && !['static', 'field'].includes(token.value.toString())) {
-            Validator.throwError('Keyword "static" or "field"', token);
+    public static validateKeyword(token: Token, keyword: string) {
+        if (token.type !== 'KEYWORD' && token.value !== keyword) {
+            Validator.throwError(`Keyword "${keyword}"`, token);
         }
     }
 
-    public static validateSubroutineVarScope(token: Token): void {
-        if (token.type !== 'KEYWORD' && token.value.toString() !== 'var') {
-            Validator.throwError('Keyword "var"', token);
-        }
-    }
-
-    public static validateSubroutineType(token: Token): void {
-        if (token.type !== 'KEYWORD' && !['constructor', 'function', 'method'].includes(token.value.toString())) {
-            Validator.throwError('Keyword "constructor", "function" or "method"', token);
+    public static validateKeywords(token: Token, keywords: string[]): void {
+        if (token.type !== 'KEYWORD' && !keywords.includes(token.value.toString())) {
+            Validator.throwError(`Keyword ${keywords.map((kw) => `"${kw}"`).join(', ')}`, token);
         }
     }
 
     public static validateType(token: Token, additional?: string[]): void {
-        let types = ['int', 'char', 'boolean'];
+        let types = [...TYPES];
 
         if (additional && additional.length > 0) {
             types = [...types, ...additional];
@@ -41,39 +36,9 @@ export default class Validator {
         this.validateType(token, ['void']);
     }
 
-    public static validateIdentifier(token: Token): void {
-        if (token.type !== 'IDENTIFIER') {
-            Validator.throwError('Identifier', token);
-        }
-    }
-
-    public static validateBlockBracketsOpen(token: Token): void {
-        if (token.type !== 'SYMBOL' && token.value !== '{') {
-            Validator.throwError('Symbol "{"', token);
-        }
-    }
-
-    public static validateBlockBracketsClose(token: Token): void {
-        if (token.type !== 'SYMBOL' && token.value !== '}') {
-            Validator.throwError('Symbol "}"', token);
-        }
-    }
-
-    public static validateBracketsOpen(token: Token): void {
-        if (token.type !== 'SYMBOL' && token.value !== '(') {
-            Validator.throwError('Symbol "("', token);
-        }
-    }
-
-    public static validateBracketsClose(token: Token): void {
-        if (token.type !== 'SYMBOL' && token.value !== ')') {
-            Validator.throwError('Symbol ")"', token);
-        }
-    }
-
-    public static validateSemicolon(token: Token): void {
-        if (token.type !== 'SYMBOL' && token.value !== ';') {
-            Validator.throwError('Symbol ";"', token);
+    public static validateSymbol(token: Token, symbol: string) {
+        if (token.type !== 'SYMBOL' && token.value !== symbol) {
+            Validator.throwError(`Symbol "${symbol}"`, token);
         }
     }
 

@@ -49,13 +49,13 @@ export default class Parser {
         this.writeOutput('<class>');
 
         this.setNextToken();
-        this.parseClassKeyword();
+        this.parseKeyword('class');
 
         this.setNextToken();
         this.parseIdentifier();
 
         this.setNextToken();
-        this.parseBlockBracketsOpen();
+        this.parseSymbol('{');
 
         while (this.tokenizer.hasMoreTokens()) {
             this.setNextToken();
@@ -71,7 +71,7 @@ export default class Parser {
                     this.parseSubroutineDec();
                     break;
                 default:
-                    this.parseBlockBracketsClose();
+                    this.parseSymbol('}');
                     break;
             }
         }
@@ -96,41 +96,40 @@ export default class Parser {
         }
     }
 
-    private parseClassKeyword() {
-        Validator.validateClassKeyword(this.token);
-        this.writeOutput();
-    }
-
     private parseIdentifier() {
         Validator.validateIdentifier(this.token);
         this.writeOutput();
     }
 
-    private parseBlockBracketsOpen() {
-        Validator.validateBlockBracketsOpen(this.token);
+    private parseKeyword(keyword: string) {
+        Validator.validateKeyword(this.token, keyword);
         this.writeOutput();
     }
 
-    private parseBlockBracketsClose() {
-        Validator.validateBlockBracketsClose(this.token);
+    private parseOneOfKeywords(keywords: string[]) {
+        Validator.validateKeywords(this.token, keywords);
         this.writeOutput();
     }
 
-    private parseBracketsOpen() {
-        Validator.validateBlockBracketsOpen(this.token);
+    private parseSymbol(symbol: string) {
+        Validator.validateSymbol(this.token, symbol);
         this.writeOutput();
     }
 
-    private parseBracketsClose() {
-        Validator.validateBracketsClose(this.token);
+    private parseType() {
+        Validator.validateType(this.token);
+        this.writeOutput();
+    }
+
+    private parseSubroutineReturnType() {
+        Validator.validateSubroutineReturnType(this.token);
         this.writeOutput();
     }
 
     private parseClassVarDec() {
-        Validator.validateClassVarScope(this.token);
         this.writeOutput('<classVarDec>');
-        this.writeOutput();
 
+        this.parseOneOfKeywords(['field', 'static']);
         this.setNextToken();
         this.parseVarDec();
 
@@ -138,24 +137,22 @@ export default class Parser {
     }
 
     private parseSubroutineDec() {
-        Validator.validateSubroutineType(this.token);
         this.writeOutput('<subroutineDec>');
-        this.writeOutput();
+
+        this.parseOneOfKeywords(['constructor', 'method', 'function']);
 
         this.setNextToken();
-        Validator.validateSubroutineReturnType(this.token);
-        this.writeOutput();
+        this.parseSubroutineReturnType();
 
         this.setNextToken();
-        Validator.validateIdentifier(this.token);
-        this.writeOutput();
+        this.parseIdentifier();
 
         this.setNextToken();
-        this.parseBracketsOpen();
+        this.parseSymbol('(');
 
         this.setNextToken();
         this.parseParameterList();
-        this.parseBracketsClose();
+        this.parseSymbol(')');
 
         this.setNextToken();
         this.parseSubroutineBody();
@@ -184,24 +181,21 @@ export default class Parser {
     }
 
     private parseParameter() {
-        Validator.validateType(this.token);
-        this.writeOutput();
-
+        this.parseType();
         this.setNextToken();
-        Validator.validateIdentifier(this.token);
-        this.writeOutput();
+        this.parseIdentifier();
     }
 
     private parseSubroutineBody() {
         this.writeOutput('<subroutineBody>');
-        this.parseBlockBracketsOpen();
 
+        this.parseSymbol('{');
         this.setNextToken();
         this.parseSubroutineVars();
         this.parseStatements();
+        this.parseSymbol('}');
 
-        this.parseBlockBracketsClose();
-        this.output.push('</subroutineBody>');
+        this.writeOutput('</subroutineBody>');
     }
 
     private parseSubroutineVars() {
@@ -212,10 +206,9 @@ export default class Parser {
     }
 
     private parseSubroutineVarDec() {
-        Validator.validateSubroutineVarScope(this.token);
         this.writeOutput('<varDec>');
-        this.writeOutput();
 
+        this.parseKeyword('var');
         this.setNextToken();
         this.parseVarDec();
 
@@ -227,12 +220,10 @@ export default class Parser {
      * which is used in "classVarDec" and "varDec" rule structures
      */
     private parseVarDec() {
-        Validator.validateType(this.token);
-        this.writeOutput();
+        this.parseType();
 
         this.setNextToken();
-        Validator.validateIdentifier(this.token);
-        this.writeOutput();
+        this.parseIdentifier();
 
         let semicolonReached: boolean = false;
         while (!semicolonReached) {
@@ -241,38 +232,171 @@ export default class Parser {
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeOutput();
                 this.setNextToken();
-                Validator.validateIdentifier(this.token);
-                this.writeOutput();
+                this.parseIdentifier();
             } else {
-                Validator.validateSemicolon(this.token);
-                this.writeOutput();
+                this.parseSymbol(';');
                 semicolonReached = true;
             }
         }
     }
 
+    /**
+     * Parses statements
+     * (after execution the "setNextToken" method call is not needed)
+     */
     private parseStatements() {
-        // parses a sequence of statements (does not handle enclosing "{}")
+        this.writeOutput('<statements>');
+
+        let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === '}';
+        while (!closingBracketsReached) {
+            switch (this.token.value) {
+                case 'let':
+                    this.parseLet();
+                    break;
+                case 'if':
+                    this.parseIf();
+                    break;
+                case 'while':
+                    this.parseWhile();
+                    break;
+                case 'do':
+                    this.parseDo();
+                    break;
+                case 'return':
+                    this.parseReturn();
+                    break;
+                default:
+                    closingBracketsReached = true;
+                    break;
+            }
+
+            if (!closingBracketsReached) {
+                this.setNextToken();
+            }
+        }
+
+        this.writeOutput('</statements>');
     }
 
     private parseLet() {
-        // parses a let statement
+        this.writeOutput('<letStatement>');
+        this.parseKeyword('let');
+
+        this.setNextToken();
+        this.parseIdentifier();
+
+        this.setNextToken();
+        if (this.token.value !== '=') {
+            this.parseSymbol('[');
+
+            this.setNextToken();
+            this.parseExpression();
+
+            this.setNextToken();
+            this.parseSymbol(']');
+
+            this.setNextToken();
+        }
+
+        this.parseSymbol('=');
+
+        this.setNextToken();
+        this.parseExpression();
+
+        this.setNextToken();
+        this.parseSymbol(';');
+
+        this.writeOutput('</letStatement>');
     }
 
     private parseIf() {
-        // parses an if statement (possibly with a traling else clause)
+        this.writeOutput('<ifStatement>');
+
+        this.parseKeyword('if');
+
+        this.setNextToken();
+        this.parseSymbol('(');
+
+        this.setNextToken();
+        this.parseExpression();
+
+        this.setNextToken();
+        this.parseSymbol(')');
+
+        this.setNextToken();
+        this.parseSymbol('{');
+
+        this.parseStatements();
+        this.parseSymbol('}');
+
+        const tokenAhead: Token = this.tokenizer.lookAhead();
+        if (tokenAhead && tokenAhead.value === 'else') {
+            this.setNextToken();
+            this.parseKeyword('else');
+
+            this.setNextToken();
+            this.parseSymbol('{');
+
+            this.setNextToken();
+            this.parseStatements();
+            this.parseSymbol('}');
+        }
+
+        this.writeOutput('</ifStatement>');
     }
 
     private parseWhile() {
-        // parses while statement
+        this.writeOutput('<whileStatement>');
+
+        this.parseKeyword('while');
+
+        this.setNextToken();
+        this.parseSymbol('(');
+
+        this.setNextToken();
+        this.parseExpression();
+
+        this.setNextToken();
+        this.parseSymbol(')');
+
+        this.setNextToken();
+        this.parseSymbol('{');
+
+        this.setNextToken();
+        this.parseStatements();
+        this.parseSymbol('}');
+
+        this.writeOutput('</whileStatement>');
     }
 
     private parseDo() {
-        // parses do statement
+        this.writeOutput('<doStatement>');
+
+        this.parseKeyword('do');
+
+        this.setNextToken();
+        this.parseSubroutineCall();
+
+        this.setNextToken();
+        this.parseSymbol(';');
+
+        this.writeOutput('</doStatement>');
     }
 
     private parseReturn() {
-        // parses return statement
+        this.writeOutput('<returnStatement>');
+
+        this.parseKeyword('return');
+
+        this.setNextToken();
+        if (this.token.value !== ';') {
+            this.parseExpression();
+            this.setNextToken();
+        }
+
+        this.parseSymbol(';');
+
+        this.writeOutput('</returnStatement>');
     }
 
     private parseExpression() {
@@ -286,4 +410,6 @@ export default class Parser {
     private parseExpressionList() {
         // parses a (possibly empty) comma-separated list of expressions
     }
+
+    private parseSubroutineCall() {}
 }

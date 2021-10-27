@@ -44,6 +44,14 @@ export const SYMBOLS: string[] = [
     '~',
 ];
 
+export const KEYWORD_CONSTANTS: string[] = ['true', 'false', 'null', 'this'];
+
+export const TYPES: string[] = ['int', 'char', 'boolean'];
+
+export const OPERATORS: string[] = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
+
+export const UNARY_OPERATORS: string[] = ['-', '~'];
+
 export const TOKEN_SEPARATOR_REGEXP =
     /\s|(?=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])|(?<=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])/g;
 
