@@ -44,7 +44,7 @@ export const SYMBOLS: string[] = [
     '~',
 ];
 
-export const TOKEN_SEPERATOR_REGEXP =
+export const TOKEN_SEPARATOR_REGEXP =
     /\s|(?=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])|(?<=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])/g;
 
 export const INTEGER_MIN = 0;

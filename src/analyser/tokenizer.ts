@@ -1,33 +1,7 @@
-import { KEYWORDS, SYMBOLS, TOKEN_SEPERATOR_REGEXP } from './defines';
+import { KEYWORDS, SYMBOLS, TOKEN_SEPARATOR_REGEXP } from './defines';
 import Token from './token';
 
-const rawInput: string[] = `
-/*
-    .jack file
-*/
-
-/**
-*    other comments
-     hehe
-****/
-
-// compact code
-constructor Game new() {let PLAYER_X=1;let board=Board.new();do init();return this;}
-constructor _weirdClass55_a new() {do nothing();}
-
-// normal code
-method void init() {
-    let gameInProgress = false;
-    let gameIsDraw = false;
-    let currentPlayer = PLAYER_O;
-    let message = "Hello!";
-    let interesting_variable99 = 1;
-
-    return;
-}
-`.split('\n');
-
-class Tokenizer {
+export default class Tokenizer {
     private readonly tokens: Token[];
     private currentTokenIndex: number;
 
@@ -50,7 +24,7 @@ class Tokenizer {
         let tokens: Token[] = [];
 
         for (const line of input) {
-            const rawTokens = line.split(TOKEN_SEPERATOR_REGEXP).filter((rt) => rt !== '' && rt !== ' ');
+            const rawTokens = line.split(TOKEN_SEPARATOR_REGEXP).filter((rt) => rt !== '' && rt !== ' ');
             const generatedTokens = rawTokens.map((t) => this.generateToken(t));
             tokens = [...tokens, ...generatedTokens];
         }
@@ -109,9 +83,17 @@ class Tokenizer {
         }
     }
 
-    public getCurrentToken(): Token | null {
+    public look(): Token | null {
         if (typeof this.currentTokenIndex !== 'undefined') {
             return this.tokens[this.currentTokenIndex];
+        }
+
+        return null;
+    }
+
+    public lookAhead() {
+        if (this.hasMoreTokens()) {
+            return this.tokens[this.currentTokenIndex + 1];
         }
 
         return null;
@@ -120,7 +102,8 @@ class Tokenizer {
     public printTokens(): void {
         console.log(this.tokens);
     }
-}
 
-const tokenizer = new Tokenizer(rawInput);
-tokenizer.printTokens();
+    public printTokensXML(): void {
+        console.log(this.tokens.map((t) => t.xml));
+    }
+}
