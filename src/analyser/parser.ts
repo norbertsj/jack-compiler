@@ -1,40 +1,7 @@
 import Tokenizer from './tokenizer';
 import Token from './token';
 import Validator from './validator';
-
-/**
- * PROGRAM STRUCTURE
- * class: 'class' className '{' classVarDec* subroutineDec* '}'
- * classVarDec: ('static'|'field') type varName (','varName)* ';'
- * type: 'int'|'char'|'boolean'|className
- * subroutineDec: ('constructor'|'function'|'method') ('void'|type) subroutineName
- *     '(' parameterList ')' subroutineBody
- * parameterList: ( (type varName) (','type varName)*)?
- * subroutineBody: '{' varDec* statements '}'
- * varDec: 'var' type varName (','varName)* ';'
- * className: identifier
- * subroutineName: identifier
- * varName: identifier
- *
- * STATEMENTS
- * statements: statement*
- * statement: letStatement|ifStatement|whileStatement|doStatement|returnStatement
- * letStatment: 'let' varName ('[' expression ']')? '=' expression ';'
- * ifStatement: 'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
- * whileStatement: 'while' '(' expression ')' '{' statements '}'
- * doStatement: 'do' subroutineCall ';'
- * returnStatement: 'return' expression? ';'
- *
- * EXPRESSIONS
- * expression: term (op term)*
- * term: integerConstant|stringConstant|keywordConstant|varName|varName '[' expression ']'
- *     | subroutineCall|'(' expression ')'|unaryOp term
- * subroutineCall: subroutineName '(' expressionList ')'|(className|varName)'.'subroutineName '(' expressionList ')'
- * expressionList: (expression (','expression)*)?
- * op: '+'|'-'|'*'|'/'|'&'|'|'|'<'|'>'|'='
- * unaryOp: '-'|'~'
- * keywordConstant: 'true'|'false'|'null'|'this'
- */
+import { KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from './defines';
 
 export default class Parser {
     private readonly tokenizer: Tokenizer;
@@ -116,6 +83,11 @@ export default class Parser {
         this.writeOutput();
     }
 
+    private parseOneOfSymbols(symbols: string[]) {
+        Validator.validateSymbols(this.token, symbols);
+        this.writeOutput();
+    }
+
     private parseType() {
         Validator.validateType(this.token);
         this.writeOutput();
@@ -123,6 +95,11 @@ export default class Parser {
 
     private parseSubroutineReturnType() {
         Validator.validateSubroutineReturnType(this.token);
+        this.writeOutput();
+    }
+
+    private parseInteger() {
+        Validator.validateIntegerValue(this.token);
         this.writeOutput();
     }
 
@@ -400,11 +377,74 @@ export default class Parser {
     }
 
     private parseExpression() {
-        // parses expression
+        this.writeOutput('<expression>');
+
+        this.parseTerm();
+
+        this.setNextToken();
+        while (this.token.type === 'SYMBOL' && OPERATORS.includes(this.token.value as string)) {
+            this.writeOutput();
+            this.setNextToken();
+            this.parseTerm();
+            this.setNextToken();
+        }
+
+        this.writeOutput('</expression>');
     }
 
     private parseTerm() {
-        // parses a term (can use tokenizer.lookAhead for to distinguish between variable, array or subroutine call)
+        this.writeOutput('<term>');
+
+        switch (this.token.type) {
+            case 'INT_CONST':
+                this.parseInteger();
+                break;
+            case 'STRING_CONST':
+                this.writeOutput();
+                break;
+            case 'KEYWORD':
+                this.parseOneOfKeywords(KEYWORD_CONSTANTS);
+                break;
+            case 'IDENTIFIER':
+                const tokenAhead: Token = this.tokenizer.lookAhead();
+
+                if (tokenAhead && tokenAhead.value === '[') {
+                    this.writeOutput();
+
+                    this.setNextToken();
+                    this.parseSymbol('[');
+
+                    this.setNextToken();
+                    this.parseExpression();
+
+                    this.setNextToken();
+                    this.parseSymbol(']');
+                } else if (tokenAhead && tokenAhead.value === '(') {
+                    this.parseSubroutineCall();
+                } else {
+                    this.writeOutput();
+                }
+
+                break;
+            case 'SYMBOL':
+                if (this.token.value === '(') {
+                    this.parseSymbol('(');
+
+                    this.setNextToken();
+                    this.parseExpression();
+
+                    this.setNextToken();
+                    this.parseSymbol(')');
+                } else {
+                    this.parseOneOfSymbols(UNARY_OPERATORS);
+                    this.setNextToken();
+                    this.parseTerm();
+                }
+
+                break;
+        }
+
+        this.writeOutput('</term>');
     }
 
     private parseExpressionList() {
