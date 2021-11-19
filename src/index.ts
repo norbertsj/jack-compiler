@@ -1,47 +1,41 @@
-import { createReadStream, createWriteStream, WriteStream, statSync, Stats, readdirSync } from 'fs';
-import { createInterface } from 'readline';
+import { statSync, Stats, readdirSync } from 'fs';
 import * as path from 'path';
+import { writeFile, readFile, OutputFile, createOutputFile } from './io';
 import SyntaxAnalyser from './analyser';
 
-interface OutputFile {
-    data: string[];
-    path: string;
-}
-
-function createOutputFile(data: string[], parsedPath: path.ParsedPath, ext: string): OutputFile {
-    return {
-        data,
-        path: parsedPath.dir.length > 0 ? `${parsedPath.dir}/${parsedPath.name}.${ext}` : `${parsedPath.name}.${ext}`,
-    };
-}
-
-function compileFile(input: string[]): string[] {
+function compileVM(input: string[]): string[] {
     return [];
 }
 
-function writeFile(file: OutputFile): void {
-    const wstream: WriteStream = createWriteStream(file.path);
+async function compile(
+    filePath: string,
+    fileName: string,
+    parsedPath: path.ParsedPath,
+    args: string[],
+    fromDir: boolean = false
+): Promise<OutputFile[]> {
+    const outputFiles: OutputFile[] = [];
 
-    for (const line of file.data) {
-        wstream.write(line + '\n');
+    const input: string[] = await readFile(filePath);
+    outputFiles.push(createOutputFile(compileVM(input), fileName, parsedPath, 'vm', fromDir));
+
+    if (args.includes('--syntax-tree')) {
+        outputFiles.push(createOutputFile(SyntaxAnalyser.getClass(input), fileName, parsedPath, 'xml', fromDir));
     }
-}
 
-function readFile(filePath: string): Promise<string[]> {
-    return new Promise((resolve) => {
-        const data: string[] = [];
+    if (args.includes('--tokens')) {
+        outputFiles.push(
+            createOutputFile(
+                SyntaxAnalyser.getClassTokens(input),
+                fileName + 'T',
+                { ...parsedPath, name: parsedPath.name + 'T' },
+                'xml',
+                fromDir
+            )
+        );
+    }
 
-        const rl = createInterface({
-            input: createReadStream(filePath),
-            crlfDelay: Infinity,
-        });
-
-        rl.on('line', (line) => data.push(line));
-
-        rl.on('close', () => {
-            resolve(data);
-        });
-    });
+    return outputFiles;
 }
 
 async function main(): Promise<void> {
@@ -55,28 +49,24 @@ async function main(): Promise<void> {
 
         const parsedPath: path.ParsedPath = path.parse(providedPath);
         const stats: Stats = statSync(providedPath);
-        const outputFiles: OutputFile[] = [];
+        let outputFiles: OutputFile[] = [];
 
         if (parsedPath.ext === '.jack' && !stats.isDirectory()) {
-            const input: string[] = await readFile(providedPath);
-            outputFiles.push(createOutputFile(compileFile(input), parsedPath, 'vm'));
-
-            if (args.includes('--syntax-tree')) {
-                outputFiles.push(createOutputFile(SyntaxAnalyser.getClass(input), parsedPath, 'xml'));
-            }
-
-            if (args.includes('--tokens')) {
-                outputFiles.push(
-                    createOutputFile(
-                        SyntaxAnalyser.getClassTokens(input),
-                        { ...parsedPath, name: parsedPath.name + 'T' },
-                        'xml'
-                    )
-                );
-            }
+            outputFiles = await compile(providedPath, '', parsedPath, args);
         } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length > 0) {
-            // compile a directory of files
-            console.log('Directory compilation not implemented yet');
+            const fileNames: string[] = readdirSync(providedPath).filter((f) => f.includes('.jack'));
+            for (const fileName of fileNames) {
+                outputFiles = [
+                    ...outputFiles,
+                    ...(await compile(
+                        `${providedPath}/${fileName}`,
+                        fileName.replace('.jack', ''),
+                        parsedPath,
+                        args,
+                        true
+                    )),
+                ];
+            }
         } else {
             throw new Error('Path argument is not valid (must be either a .jack file or an existing directory)');
         }
