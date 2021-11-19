@@ -1,4 +1,4 @@
-import { KEYWORDS, SYMBOLS, TOKEN_SEPARATOR_REGEXP } from './defines';
+import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from './defines';
 import Token from './token';
 
 export default class Tokenizer {
@@ -14,7 +14,7 @@ export default class Tokenizer {
         return input
             .join('\n')
             .replace(/\/+\*([\s\S]*?)\*\//gm, '')
-            .replace(/\/+.*$/gm, '')
+            .replace(/\/{2}.*$/gm, '')
             .trim()
             .split('\n')
             .filter((line) => line.length > 0);
@@ -24,7 +24,10 @@ export default class Tokenizer {
         let tokens: Token[] = [];
 
         for (const line of input) {
-            const rawTokens = line.split(TOKEN_SEPARATOR_REGEXP).filter((rt) => rt !== '' && rt !== ' ');
+            const rawTokens = line
+                .split(TOKEN_SEPARATOR_REGEXP)
+                .filter((rt) => rt !== '' && rt !== ' ')
+                .map((t) => t.trim());
             const generatedTokens = rawTokens.map((t) => this.generateToken(t));
             tokens = [...tokens, ...generatedTokens];
         }
@@ -44,7 +47,9 @@ export default class Tokenizer {
             token.xml = `<keyword>${input}</keyword>`;
         } else if (SYMBOLS.includes(input)) {
             token.type = 'SYMBOL';
-            token.xml = `<symbol>${input}</symbol>`;
+            token.xml = MARKUP_SYMBOLS_MAP.has(input)
+                ? `<symbol>${MARKUP_SYMBOLS_MAP.get(input)}</symbol>`
+                : `<symbol>${input}</symbol>`;
         } else if (!isNaN(parseInt(input, 10))) {
             token.type = 'INT_CONST';
             token.value = parseInt(input, 10);
@@ -91,7 +96,7 @@ export default class Tokenizer {
         return null;
     }
 
-    public lookAhead() {
+    public lookAhead(): Token | null {
         if (this.hasMoreTokens()) {
             return this.tokens[this.currentTokenIndex + 1];
         }
@@ -99,11 +104,7 @@ export default class Tokenizer {
         return null;
     }
 
-    public printTokens(): void {
-        console.log(this.tokens);
-    }
-
-    public printTokensXML(): void {
-        console.log(this.tokens.map((t) => t.xml));
+    public getTokens(): string[] {
+        return ['<tokens>', ...this.tokens.map((t) => t.xml), '</tokens>'];
     }
 }

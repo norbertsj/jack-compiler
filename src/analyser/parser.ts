@@ -12,7 +12,7 @@ export default class Parser {
         this.tokenizer = new Tokenizer(input);
     }
 
-    public parseClass() {
+    public parseClass(): void {
         this.writeOutput('<class>');
 
         this.setNextToken();
@@ -55,7 +55,7 @@ export default class Parser {
         this.token = this.tokenizer.look();
     }
 
-    private writeOutput(xmlString?: string) {
+    private writeOutput(xmlString?: string): void {
         if (typeof xmlString === 'undefined') {
             this.output.push(this.token.xml);
         } else {
@@ -63,47 +63,47 @@ export default class Parser {
         }
     }
 
-    private parseIdentifier() {
+    private parseIdentifier(): void {
         Validator.validateIdentifier(this.token);
         this.writeOutput();
     }
 
-    private parseKeyword(keyword: string) {
+    private parseKeyword(keyword: string): void {
         Validator.validateKeyword(this.token, keyword);
         this.writeOutput();
     }
 
-    private parseOneOfKeywords(keywords: string[]) {
+    private parseOneOfKeywords(keywords: string[]): void {
         Validator.validateKeywords(this.token, keywords);
         this.writeOutput();
     }
 
-    private parseSymbol(symbol: string) {
+    private parseSymbol(symbol: string): void {
         Validator.validateSymbol(this.token, symbol);
         this.writeOutput();
     }
 
-    private parseOneOfSymbols(symbols: string[]) {
+    private parseOneOfSymbols(symbols: string[]): void {
         Validator.validateSymbols(this.token, symbols);
         this.writeOutput();
     }
 
-    private parseType() {
+    private parseType(): void {
         Validator.validateType(this.token);
         this.writeOutput();
     }
 
-    private parseSubroutineReturnType() {
+    private parseSubroutineReturnType(): void {
         Validator.validateSubroutineReturnType(this.token);
         this.writeOutput();
     }
 
-    private parseInteger() {
+    private parseInteger(): void {
         Validator.validateIntegerValue(this.token);
         this.writeOutput();
     }
 
-    private parseClassVarDec() {
+    private parseClassVarDec(): void {
         this.writeOutput('<classVarDec>');
 
         this.parseOneOfKeywords(['field', 'static']);
@@ -113,7 +113,7 @@ export default class Parser {
         this.writeOutput('</classVarDec>');
     }
 
-    private parseSubroutineDec() {
+    private parseSubroutineDec(): void {
         this.writeOutput('<subroutineDec>');
 
         this.parseOneOfKeywords(['constructor', 'method', 'function']);
@@ -137,7 +137,7 @@ export default class Parser {
         this.writeOutput('</subroutineDec>');
     }
 
-    private parseParameterList() {
+    private parseParameterList(): void {
         this.writeOutput('<parameterList>');
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
@@ -157,13 +157,13 @@ export default class Parser {
         this.writeOutput('</parameterList>');
     }
 
-    private parseParameter() {
+    private parseParameter(): void {
         this.parseType();
         this.setNextToken();
         this.parseIdentifier();
     }
 
-    private parseSubroutineBody() {
+    private parseSubroutineBody(): void {
         this.writeOutput('<subroutineBody>');
 
         this.parseSymbol('{');
@@ -175,14 +175,14 @@ export default class Parser {
         this.writeOutput('</subroutineBody>');
     }
 
-    private parseSubroutineVars() {
+    private parseSubroutineVars(): void {
         while (this.token.type === 'KEYWORD' && this.token.value === 'var') {
             this.parseSubroutineVarDec();
             this.setNextToken();
         }
     }
 
-    private parseSubroutineVarDec() {
+    private parseSubroutineVarDec(): void {
         this.writeOutput('<varDec>');
 
         this.parseKeyword('var');
@@ -196,7 +196,7 @@ export default class Parser {
      * Parses "type varName (','varName)* ';'"
      * which is used in "classVarDec" and "varDec" rule structures
      */
-    private parseVarDec() {
+    private parseVarDec(): void {
         this.parseType();
 
         this.setNextToken();
@@ -221,7 +221,7 @@ export default class Parser {
      * Parses statements
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseStatements() {
+    private parseStatements(): void {
         this.writeOutput('<statements>');
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === '}';
@@ -255,7 +255,7 @@ export default class Parser {
         this.writeOutput('</statements>');
     }
 
-    private parseLet() {
+    private parseLet(): void {
         this.writeOutput('<letStatement>');
         this.parseKeyword('let');
 
@@ -282,7 +282,7 @@ export default class Parser {
         this.writeOutput('</letStatement>');
     }
 
-    private parseIf() {
+    private parseIf(): void {
         this.writeOutput('<ifStatement>');
 
         this.parseKeyword('if');
@@ -317,7 +317,7 @@ export default class Parser {
         this.writeOutput('</ifStatement>');
     }
 
-    private parseWhile() {
+    private parseWhile(): void {
         this.writeOutput('<whileStatement>');
 
         this.parseKeyword('while');
@@ -339,7 +339,7 @@ export default class Parser {
         this.writeOutput('</whileStatement>');
     }
 
-    private parseDo() {
+    private parseDo(): void {
         this.writeOutput('<doStatement>');
 
         this.parseKeyword('do');
@@ -353,7 +353,7 @@ export default class Parser {
         this.writeOutput('</doStatement>');
     }
 
-    private parseReturn() {
+    private parseReturn(): void {
         this.writeOutput('<returnStatement>');
 
         this.parseKeyword('return');
@@ -372,7 +372,7 @@ export default class Parser {
      * Parses expression
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseExpression() {
+    private parseExpression(): void {
         this.writeOutput('<expression>');
 
         this.parseTerm();
@@ -388,7 +388,7 @@ export default class Parser {
         this.writeOutput('</expression>');
     }
 
-    private parseTerm() {
+    private parseTerm(): void {
         this.writeOutput('<term>');
 
         switch (this.token.type) {
@@ -441,7 +441,7 @@ export default class Parser {
         this.writeOutput('</term>');
     }
 
-    private parseSubroutineCall() {
+    private parseSubroutineCall(): void {
         this.parseIdentifier();
 
         this.setNextToken();
@@ -468,7 +468,7 @@ export default class Parser {
      * Parses a list of comma separated expressions
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseExpressionList() {
+    private parseExpressionList(): void {
         this.writeOutput('<expressionList>');
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
