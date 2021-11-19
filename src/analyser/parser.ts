@@ -268,8 +268,6 @@ export default class Parser {
 
             this.setNextToken();
             this.parseExpression();
-
-            this.setNextToken();
             this.parseSymbol(']');
 
             this.setNextToken();
@@ -279,8 +277,6 @@ export default class Parser {
 
         this.setNextToken();
         this.parseExpression();
-
-        this.setNextToken();
         this.parseSymbol(';');
 
         this.writeOutput('</letStatement>');
@@ -296,13 +292,12 @@ export default class Parser {
 
         this.setNextToken();
         this.parseExpression();
-
-        this.setNextToken();
         this.parseSymbol(')');
 
         this.setNextToken();
         this.parseSymbol('{');
 
+        this.setNextToken();
         this.parseStatements();
         this.parseSymbol('}');
 
@@ -332,8 +327,6 @@ export default class Parser {
 
         this.setNextToken();
         this.parseExpression();
-
-        this.setNextToken();
         this.parseSymbol(')');
 
         this.setNextToken();
@@ -368,7 +361,6 @@ export default class Parser {
         this.setNextToken();
         if (this.token.value !== ';') {
             this.parseExpression();
-            this.setNextToken();
         }
 
         this.parseSymbol(';');
@@ -376,6 +368,10 @@ export default class Parser {
         this.writeOutput('</returnStatement>');
     }
 
+    /**
+     * Parses expression
+     * (after execution the "setNextToken" method call is not needed)
+     */
     private parseExpression() {
         this.writeOutput('<expression>');
 
@@ -417,9 +413,8 @@ export default class Parser {
                     this.setNextToken();
                     this.parseExpression();
 
-                    this.setNextToken();
                     this.parseSymbol(']');
-                } else if (tokenAhead && tokenAhead.value === '(') {
+                } else if (tokenAhead && (tokenAhead.value === '(' || tokenAhead.value === '.')) {
                     this.parseSubroutineCall();
                 } else {
                     this.writeOutput();
@@ -433,7 +428,6 @@ export default class Parser {
                     this.setNextToken();
                     this.parseExpression();
 
-                    this.setNextToken();
                     this.parseSymbol(')');
                 } else {
                     this.parseOneOfSymbols(UNARY_OPERATORS);
@@ -447,9 +441,49 @@ export default class Parser {
         this.writeOutput('</term>');
     }
 
-    private parseExpressionList() {
-        // parses a (possibly empty) comma-separated list of expressions
+    private parseSubroutineCall() {
+        this.parseIdentifier();
+
+        this.setNextToken();
+        this.parseOneOfSymbols(['(', '.']);
+
+        if (this.token.value === '(') {
+            this.setNextToken();
+            this.parseExpressionList();
+            this.parseSymbol(')');
+        } else {
+            this.setNextToken();
+            this.parseIdentifier();
+
+            this.setNextToken();
+            this.parseSymbol('(');
+
+            this.setNextToken();
+            this.parseExpressionList();
+            this.parseSymbol(')');
+        }
     }
 
-    private parseSubroutineCall() {}
+    /**
+     * Parses a list of comma separated expressions
+     * (after execution the "setNextToken" method call is not needed)
+     */
+    private parseExpressionList() {
+        this.writeOutput('<expressionList>');
+
+        let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
+        while (!closingBracketsReached) {
+            this.parseExpression();
+
+            if (this.token.type === 'SYMBOL' && this.token.value === ',') {
+                this.writeOutput();
+                this.setNextToken();
+                closingBracketsReached = false; // expecting another expression
+            } else {
+                closingBracketsReached = true; // expecting closing bracket (validated later in caller)
+            }
+        }
+
+        this.writeOutput('</expressionList>');
+    }
 }
