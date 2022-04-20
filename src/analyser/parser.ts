@@ -56,11 +56,7 @@ export default class Parser {
     }
 
     private writeOutput(xmlString?: string): void {
-        if (typeof xmlString === 'undefined') {
-            this.output.push(this.token.xml);
-        } else {
-            this.output.push(xmlString);
-        }
+        this.output.push(xmlString || this.token.xml);
     }
 
     private parseIdentifier(): void {
@@ -144,13 +140,12 @@ export default class Parser {
         while (!closingBracketsReached) {
             this.parseParameter();
             this.setNextToken();
+            closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeOutput();
                 this.setNextToken();
                 closingBracketsReached = false; // expecting another parameter
-            } else {
-                closingBracketsReached = true; // expecting closing bracket (validated later in caller)
             }
         }
 
@@ -210,10 +205,11 @@ export default class Parser {
                 this.writeOutput();
                 this.setNextToken();
                 this.parseIdentifier();
-            } else {
-                this.parseSymbol(';');
-                semicolonReached = true;
+                continue;
             }
+
+            this.parseSymbol(';');
+            semicolonReached = true;
         }
     }
 
@@ -302,7 +298,7 @@ export default class Parser {
         this.parseSymbol('}');
 
         const tokenAhead: Token = this.tokenizer.lookAhead();
-        if (tokenAhead && tokenAhead.value === 'else') {
+        if (tokenAhead?.value === 'else') {
             this.setNextToken();
             this.parseKeyword('else');
 
@@ -404,7 +400,7 @@ export default class Parser {
             case 'IDENTIFIER':
                 const tokenAhead: Token = this.tokenizer.lookAhead();
 
-                if (tokenAhead && tokenAhead.value === '[') {
+                if (tokenAhead?.value === '[') {
                     this.writeOutput();
 
                     this.setNextToken();
@@ -414,12 +410,15 @@ export default class Parser {
                     this.parseExpression();
 
                     this.parseSymbol(']');
-                } else if (tokenAhead && (tokenAhead.value === '(' || tokenAhead.value === '.')) {
-                    this.parseSubroutineCall();
-                } else {
-                    this.writeOutput();
+                    break;
                 }
 
+                if (tokenAhead?.value === '(' || tokenAhead?.value === '.') {
+                    this.parseSubroutineCall();
+                    break;
+                }
+
+                this.writeOutput();
                 break;
             case 'SYMBOL':
                 if (this.token.value === '(') {
@@ -429,12 +428,12 @@ export default class Parser {
                     this.parseExpression();
 
                     this.parseSymbol(')');
-                } else {
-                    this.parseOneOfSymbols(UNARY_OPERATORS);
-                    this.setNextToken();
-                    this.parseTerm();
+                    break;
                 }
 
+                this.parseOneOfSymbols(UNARY_OPERATORS);
+                this.setNextToken();
+                this.parseTerm();
                 break;
         }
 
@@ -451,17 +450,18 @@ export default class Parser {
             this.setNextToken();
             this.parseExpressionList();
             this.parseSymbol(')');
-        } else {
-            this.setNextToken();
-            this.parseIdentifier();
-
-            this.setNextToken();
-            this.parseSymbol('(');
-
-            this.setNextToken();
-            this.parseExpressionList();
-            this.parseSymbol(')');
+            return;
         }
+
+        this.setNextToken();
+        this.parseIdentifier();
+
+        this.setNextToken();
+        this.parseSymbol('(');
+
+        this.setNextToken();
+        this.parseExpressionList();
+        this.parseSymbol(')');
     }
 
     /**
@@ -474,13 +474,12 @@ export default class Parser {
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
         while (!closingBracketsReached) {
             this.parseExpression();
+            closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeOutput();
                 this.setNextToken();
                 closingBracketsReached = false; // expecting another expression
-            } else {
-                closingBracketsReached = true; // expecting closing bracket (validated later in caller)
             }
         }
 

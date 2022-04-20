@@ -9,6 +9,42 @@ export default class Tokenizer {
         this.tokens = this.tokenize(this.removeComments(input));
     }
 
+    public hasMoreTokens(): boolean {
+        if (this.currentIndexIsUndefined() || this.currentTokenIndex < this.tokens.length - 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public advance(): void {
+        if (!this.hasMoreTokens()) {
+            return;
+        }
+
+        this.currentTokenIndex = this.currentIndexIsUndefined() ? 0 : this.currentTokenIndex + 1;
+    }
+
+    public look(): Token | null {
+        if (this.currentIndexIsUndefined()) {
+            return null;
+        }
+
+        return this.tokens[this.currentTokenIndex];
+    }
+
+    public lookAhead(): Token | null {
+        if (this.hasMoreTokens()) {
+            return this.tokens[this.currentTokenIndex + 1];
+        }
+
+        return null;
+    }
+
+    public getTokens(): string[] {
+        return ['<tokens>', ...this.tokens.map((t) => t.xml), '</tokens>'];
+    }
+
     private removeComments(input: string[]): string[] {
         // joining the input lines and applying regexp to multiline string
         return input
@@ -35,76 +71,41 @@ export default class Tokenizer {
         return tokens;
     }
 
-    private generateToken(input: string): Token {
+    private generateToken(value: string): Token {
         const token: Token = {
-            type: null,
-            value: input,
-            xml: null,
+            value,
+            type: 'IDENTIFIER',
+            xml: `<identifier>${value}</identifier>`,
         };
 
-        if (KEYWORDS.includes(input)) {
+        if (KEYWORDS.includes(value)) {
             token.type = 'KEYWORD';
-            token.xml = `<keyword>${input}</keyword>`;
-        } else if (SYMBOLS.includes(input)) {
+            token.xml = `<keyword>${value}</keyword>`;
+        }
+
+        if (SYMBOLS.includes(value)) {
             token.type = 'SYMBOL';
-            token.xml = MARKUP_SYMBOLS_MAP.has(input)
-                ? `<symbol>${MARKUP_SYMBOLS_MAP.get(input)}</symbol>`
-                : `<symbol>${input}</symbol>`;
-        } else if (!isNaN(parseInt(input, 10))) {
-            token.type = 'INT_CONST';
-            token.value = parseInt(input, 10);
-            token.xml = `<integerConstant>${input}</integerConstant>`;
-        } else if (input.startsWith('"') && input.endsWith('"')) {
+            token.xml = MARKUP_SYMBOLS_MAP.has(value)
+                ? `<symbol>${MARKUP_SYMBOLS_MAP.get(value)}</symbol>`
+                : `<symbol>${value}</symbol>`;
+        }
+
+        if (value.startsWith('"') && value.endsWith('"')) {
             token.type = 'STRING_CONST';
-            token.value = input.replace(/\"/g, '');
-            token.xml = `<stringConstant>${input.replace(/\"/g, '')}</stringConstant>`;
-        } else {
-            token.type = 'IDENTIFIER';
-            token.xml = `<identifier>${input}</identifier>`;
+            token.value = value.replace(/\"/g, '');
+            token.xml = `<stringConstant>${value.replace(/\"/g, '')}</stringConstant>`;
+        }
+
+        if (!isNaN(parseInt(value, 10))) {
+            token.type = 'INT_CONST';
+            token.value = parseInt(value, 10);
+            token.xml = `<integerConstant>${value}</integerConstant>`;
         }
 
         return token;
     }
 
-    public hasMoreTokens(): boolean {
-        if (typeof this.currentTokenIndex === 'undefined') {
-            return true;
-        }
-
-        if (this.currentTokenIndex < this.tokens.length - 1) {
-            return true;
-        }
-
-        return false;
-    }
-
-    public advance(): void {
-        if (this.hasMoreTokens()) {
-            if (typeof this.currentTokenIndex === 'undefined') {
-                this.currentTokenIndex = 0;
-            } else {
-                this.currentTokenIndex += 1;
-            }
-        }
-    }
-
-    public look(): Token | null {
-        if (typeof this.currentTokenIndex !== 'undefined') {
-            return this.tokens[this.currentTokenIndex];
-        }
-
-        return null;
-    }
-
-    public lookAhead(): Token | null {
-        if (this.hasMoreTokens()) {
-            return this.tokens[this.currentTokenIndex + 1];
-        }
-
-        return null;
-    }
-
-    public getTokens(): string[] {
-        return ['<tokens>', ...this.tokens.map((t) => t.xml), '</tokens>'];
+    private currentIndexIsUndefined(): boolean {
+        return typeof this.currentTokenIndex === 'undefined';
     }
 }

@@ -1,4 +1,4 @@
-import { File, readFiles, writeFiles } from './io';
+import { File, IO } from './io';
 import SyntaxAnalyser from './analyser';
 
 function compileFiles(files: File[], args: string[]) {
@@ -36,10 +36,10 @@ function compileFiles(files: File[], args: string[]) {
 
 async function main(): Promise<void> {
     try {
-        const args: string[] = process.argv.slice(2);
-        const files: File[] = await readFiles(args);
-        const compiledFiles: File[] = compileFiles(files, args);
-        writeFiles(compiledFiles);
+        const args = process.argv.slice(2);
+        const files = await IO.readFiles(args);
+        const compiledFiles = compileFiles(files, args);
+        IO.writeFiles(compiledFiles);
 
         console.log('Compilation finished');
     } catch (e) {

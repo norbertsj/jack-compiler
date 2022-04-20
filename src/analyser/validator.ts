@@ -23,7 +23,7 @@ export default class Validator {
     public static validateType(token: Token, additional?: string[]): void {
         let types = [...TYPES];
 
-        if (additional && additional.length > 0) {
+        if (additional?.length > 0) {
             types = [...types, ...additional];
         }
 

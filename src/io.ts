@@ -1,6 +1,6 @@
-import { createReadStream, createWriteStream, WriteStream, Stats, statSync, readdirSync } from 'fs';
+import { createReadStream, createWriteStream, readdirSync, statSync, Stats } from 'fs';
+import path, { ParsedPath } from 'path';
 import { createInterface } from 'readline';
-import * as path from 'path';
 
 export interface File {
     name: string;
@@ -9,68 +9,93 @@ export interface File {
     data: string[];
 }
 
-export function readFile(filePath: string): Promise<string[]> {
-    return new Promise((resolve) => {
-        const data: string[] = [];
-
-        const rl = createInterface({
-            input: createReadStream(filePath),
-            crlfDelay: Infinity,
-        });
-
-        rl.on('line', (line) => data.push(line));
-
-        rl.on('close', () => {
-            resolve(data);
-        });
-    });
+export interface PathInfo {
+    input: string;
+    parsed: ParsedPath;
+    stats: Stats;
 }
 
-export async function readFiles(args: string[]): Promise<File[]> {
-    const providedPath: string = args[0];
+export class IO {
+    public static readFile(filePath: string): Promise<string[]> {
+        return new Promise((resolve) => {
+            const data: string[] = [];
 
-    if (!providedPath) {
-        throw new Error('Path argument is missing');
+            const rl = createInterface({
+                input: createReadStream(filePath),
+                crlfDelay: Infinity,
+            });
+
+            rl.on('line', (line) => data.push(line));
+
+            rl.on('close', () => {
+                resolve(data);
+            });
+        });
     }
 
-    const parsedPath: path.ParsedPath = path.parse(providedPath);
-    const stats: Stats = statSync(providedPath);
-    let files: File[] = [];
+    public static async readFiles(args: string[]): Promise<File[]> {
+        const pathInfo = IO.getPathInfo(args[0]);
 
-    if (parsedPath.ext === '.jack' && !stats.isDirectory()) {
-        files.push({
-            name: parsedPath.name,
-            extension: null,
-            dir: parsedPath.dir,
-            data: await readFile(providedPath),
-        });
-    } else if (parsedPath.ext === '' && stats.isDirectory() && readdirSync(providedPath).length > 0) {
-        const fileNames: string[] = readdirSync(providedPath).filter((f) => f.includes('.jack'));
-        for (const fileName of fileNames) {
-            files.push({
-                name: fileName.replace('.jack', ''),
-                extension: null,
-                dir: `${parsedPath.dir}/${parsedPath.base}`,
-                data: await readFile(`${providedPath}/${fileName}`),
-            });
+        if (IO.isJackFile(pathInfo)) {
+            return [
+                {
+                    name: pathInfo.parsed.name,
+                    extension: null,
+                    dir: pathInfo.parsed.dir,
+                    data: await IO.readFile(pathInfo.input),
+                },
+            ];
         }
-    } else {
+
+        if (IO.isNonEmptyDirectory(pathInfo)) {
+            let files: File[] = [];
+            const fileNames = readdirSync(pathInfo.input).filter((f) => f.includes('.jack'));
+            for (const fileName of fileNames) {
+                files.push({
+                    name: fileName.replace('.jack', ''),
+                    extension: null,
+                    dir: `${pathInfo.parsed.dir}/${pathInfo.parsed.base}`,
+                    data: await IO.readFile(`${pathInfo.input}/${fileName}`),
+                });
+            }
+
+            return files;
+        }
+
         throw new Error('Path argument is not valid (must be either a .jack file or an existing directory)');
     }
 
-    return files;
-}
+    public static writeFile(file: File): void {
+        const wstream = createWriteStream(`${file.dir}/${file.name}.${file.extension}`);
 
-export function writeFile(file: File): void {
-    const wstream: WriteStream = createWriteStream(`${file.dir}/${file.name}.${file.extension}`);
-
-    for (const line of file.data) {
-        wstream.write(line + '\n');
+        for (const line of file.data) {
+            wstream.write(line + '\n');
+        }
     }
-}
 
-export function writeFiles(files: File[]): void {
-    for (const file of files) {
-        writeFile(file);
+    public static writeFiles(files: File[]): void {
+        for (const file of files) {
+            IO.writeFile(file);
+        }
+    }
+
+    private static getPathInfo(input: string): PathInfo {
+        if (!input) {
+            throw new Error('Path is missing');
+        }
+
+        return {
+            input,
+            parsed: path.parse(input),
+            stats: statSync(input),
+        };
+    }
+
+    private static isJackFile(pathInfo: PathInfo): boolean {
+        return pathInfo.parsed.ext === '.jack' && !pathInfo.stats.isDirectory();
+    }
+
+    private static isNonEmptyDirectory(pathInfo: PathInfo): boolean {
+        return pathInfo.parsed.ext === '' && pathInfo.stats.isDirectory() && readdirSync(pathInfo.input).length > 0;
     }
 }
