@@ -1,15 +1,20 @@
-import Tokenizer from './tokenizer';
-import Token from './token';
-import Validator from './validator';
 import { KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from './defines';
+import Token from './token';
+import Tokenizer from './tokenizer';
+import Validator from './validator';
+import { VariableKind, VariableTable } from './variable-table';
 
 export default class Parser {
     private readonly tokenizer: Tokenizer;
     private token: Token;
     private output: string[] = [];
+    private classVarTable: VariableTable;
+    private subroutineVarTable: VariableTable;
 
     constructor(input: string[]) {
         this.tokenizer = new Tokenizer(input);
+        this.classVarTable = new VariableTable();
+        this.subroutineVarTable = new VariableTable();
     }
 
     public parseClass(): void {
@@ -59,9 +64,30 @@ export default class Parser {
         this.output.push(xmlString || this.token.xml);
     }
 
-    private parseIdentifier(): void {
+    private parseIdentifier(variable?: { type: string; kind: VariableKind }): void {
         Validator.validateIdentifier(this.token);
-        this.writeOutput();
+        let output = `
+        <identifier>
+            <isVariable>false</isVariable>
+            <value>${this.token.value}</value>
+        </identifier>
+        `;
+        if (variable) {
+            const table = ['local', 'argument'].includes(variable.kind) ? 'subroutine' : 'class';
+            const toAdd = { ...variable, name: this.token.value.toString() };
+            const added = table === 'subroutine' ? this.subroutineVarTable.add(toAdd) : this.classVarTable.add(toAdd);
+            output = `
+            <identifier>
+                <isVariable>true</isVariable>
+                <value>${this.token.value}</value>
+                <type>${variable.type}</type>
+                <kind>${variable.kind}</kind>
+                <varTable>${table}</varTable>
+                <varTableIndex>${added.index}</varTableIndex>
+            </identifier>`;
+        }
+
+        this.writeOutput(output);
     }
 
     private parseKeyword(keyword: string): void {
@@ -103,8 +129,9 @@ export default class Parser {
         this.writeOutput('<classVarDec>');
 
         this.parseOneOfKeywords(['field', 'static']);
+        const kind = this.token.value;
         this.setNextToken();
-        this.parseVarDec();
+        this.parseVarDec(<VariableKind>kind);
 
         this.writeOutput('</classVarDec>');
     }
@@ -131,6 +158,7 @@ export default class Parser {
         this.parseSubroutineBody();
 
         this.writeOutput('</subroutineDec>');
+        this.subroutineVarTable.reset();
     }
 
     private parseParameterList(): void {
@@ -154,8 +182,9 @@ export default class Parser {
 
     private parseParameter(): void {
         this.parseType();
+        const type = this.token.value.toString();
         this.setNextToken();
-        this.parseIdentifier();
+        this.parseIdentifier({ type, kind: 'argument' });
     }
 
     private parseSubroutineBody(): void {
@@ -182,7 +211,7 @@ export default class Parser {
 
         this.parseKeyword('var');
         this.setNextToken();
-        this.parseVarDec();
+        this.parseVarDec('local');
 
         this.writeOutput('</varDec>');
     }
@@ -191,11 +220,11 @@ export default class Parser {
      * Parses "type varName (','varName)* ';'"
      * which is used in "classVarDec" and "varDec" rule structures
      */
-    private parseVarDec(): void {
+    private parseVarDec(kind: VariableKind): void {
         this.parseType();
-
+        const type = this.token.value.toString();
         this.setNextToken();
-        this.parseIdentifier();
+        this.parseIdentifier({ type, kind });
 
         let semicolonReached: boolean = false;
         while (!semicolonReached) {
@@ -204,7 +233,7 @@ export default class Parser {
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeOutput();
                 this.setNextToken();
-                this.parseIdentifier();
+                this.parseIdentifier({ type, kind });
                 continue;
             }
 
