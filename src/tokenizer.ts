@@ -1,15 +1,15 @@
 import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from './defines';
-import Token from './token';
+import { Token } from './token';
 
-export default class Tokenizer {
+export class Tokenizer {
     private readonly tokens: Token[];
     private currentTokenIndex: number;
 
-    public constructor(input: string[]) {
+    constructor(input: string[]) {
         this.tokens = this.tokenize(this.removeComments(input));
     }
 
-    public hasMoreTokens(): boolean {
+    hasMoreTokens(): boolean {
         if (this.currentIndexIsUndefined() || this.currentTokenIndex < this.tokens.length - 1) {
             return true;
         }
@@ -17,7 +17,7 @@ export default class Tokenizer {
         return false;
     }
 
-    public advance(): void {
+    advance(): void {
         if (!this.hasMoreTokens()) {
             return;
         }
@@ -25,7 +25,7 @@ export default class Tokenizer {
         this.currentTokenIndex = this.currentIndexIsUndefined() ? 0 : this.currentTokenIndex + 1;
     }
 
-    public look(): Token | null {
+    look(): Token | null {
         if (this.currentIndexIsUndefined()) {
             return null;
         }
@@ -33,7 +33,7 @@ export default class Tokenizer {
         return this.tokens[this.currentTokenIndex];
     }
 
-    public lookAhead(): Token | null {
+    lookAhead(): Token | null {
         if (this.hasMoreTokens()) {
             return this.tokens[this.currentTokenIndex + 1];
         }
@@ -41,7 +41,7 @@ export default class Tokenizer {
         return null;
     }
 
-    public getTokens(): string[] {
+    getTokens(): string[] {
         return ['<tokens>', ...this.tokens.map((t) => t.xml), '</tokens>'];
     }
 

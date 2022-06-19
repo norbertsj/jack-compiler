@@ -1,26 +1,26 @@
-import Token from './token';
+import { Token } from './token';
 import { TYPES, INTEGER_MIN, INTEGER_MAX } from './defines';
 
-export default class Validator {
-    public static validateIdentifier(token: Token): void {
+export class Validator {
+    static validateIdentifier(token: Token): void {
         if (token.type !== 'IDENTIFIER') {
             Validator.throwError('Identifier', token);
         }
     }
 
-    public static validateKeyword(token: Token, keyword: string) {
+    static validateKeyword(token: Token, keyword: string) {
         if (token.type !== 'KEYWORD' || token.value !== keyword) {
             Validator.throwError(`Keyword "${keyword}"`, token);
         }
     }
 
-    public static validateKeywords(token: Token, keywords: string[]): void {
+    static validateKeywords(token: Token, keywords: string[]): void {
         if (token.type !== 'KEYWORD' || !keywords.includes(token.value as string)) {
             Validator.throwError(`Keyword ${keywords.map((kw) => `"${kw}"`).join(', ')}`, token);
         }
     }
 
-    public static validateType(token: Token, additional?: string[]): void {
+    static validateType(token: Token, additional?: string[]): void {
         let types = [...TYPES];
 
         if (additional?.length > 0) {
@@ -34,23 +34,23 @@ export default class Validator {
         Validator.throwError(`Keyword ${types.map((t) => `"${t}"`).join()} or className identifier`, token);
     }
 
-    public static validateSubroutineReturnType(token: Token): void {
+    static validateSubroutineReturnType(token: Token): void {
         this.validateType(token, ['void']);
     }
 
-    public static validateSymbol(token: Token, symbol: string): void {
+    static validateSymbol(token: Token, symbol: string): void {
         if (token.type !== 'SYMBOL' || token.value !== symbol) {
             Validator.throwError(`Symbol "${symbol}"`, token);
         }
     }
 
-    public static validateSymbols(token: Token, symbols: string[]): void {
+    static validateSymbols(token: Token, symbols: string[]): void {
         if (token.type !== 'SYMBOL' || !symbols.includes(token.value as string)) {
             Validator.throwError(`Symbol ${symbols.map((s) => `"${s}"`).join(', ')}`, token);
         }
     }
 
-    public static validateIntegerValue(token: Token): void {
+    static validateIntegerValue(token: Token): void {
         const intVal = parseInt(token.value as string, 10);
 
         if (token.type !== 'INT_CONST' || isNaN(intVal) || intVal < INTEGER_MIN || intVal > INTEGER_MAX) {

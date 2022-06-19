@@ -63,3 +63,5 @@ export const TOKEN_SEPARATOR_REGEXP =
 
 export const INTEGER_MIN = 0;
 export const INTEGER_MAX = 32767;
+
+export const INDENT_SIZE = 4;

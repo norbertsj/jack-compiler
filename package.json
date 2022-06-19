@@ -4,7 +4,7 @@
     "description": "Compiler for Jack programming language",
     "main": "index.js",
     "scripts": {
-        "build-tsc": "tsc",
+        "build": "tsc",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "norberts.jegers@gmail.com",

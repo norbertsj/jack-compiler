@@ -13,7 +13,7 @@ export interface Variable extends VariableInput {
 export class VariableTable {
     private variables: Variable[] = [];
 
-    public add(variable: VariableInput): Variable {
+    add(variable: VariableInput): Variable {
         this.checkDuplicate(variable);
         const index = this.kindCount(variable.kind);
         const newVar = { ...variable, index };
@@ -21,7 +21,7 @@ export class VariableTable {
         return newVar;
     }
 
-    public find(name: string): Variable | null {
+    find(name: string): Variable | null {
         const variable = this.variables.find((v) => v.name === name);
         if (!variable) {
             return null;
@@ -30,7 +30,7 @@ export class VariableTable {
         return variable;
     }
 
-    public reset(): void {
+    reset(): void {
         this.variables = [];
     }
 
