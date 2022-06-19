@@ -65,3 +65,6 @@ export const INTEGER_MIN = 0;
 export const INTEGER_MAX = 32767;
 
 export const INDENT_SIZE = 4;
+
+export type IdentifierCategory = 'variable' | 'class' | 'subroutine';
+export type IdentifierContext = 'declaration' | 'definition' | 'usage';

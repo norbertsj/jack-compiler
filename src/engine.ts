@@ -1,4 +1,11 @@
-import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from './defines';
+import {
+    IdentifierCategory,
+    IdentifierContext,
+    INDENT_SIZE,
+    KEYWORD_CONSTANTS,
+    OPERATORS,
+    UNARY_OPERATORS,
+} from './defines';
 import { Token } from './token';
 import { Tokenizer } from './tokenizer';
 import { Validator } from './validator';
@@ -29,7 +36,7 @@ export class CompilationEngine {
         this.compileKeyword('class');
 
         this.setNextToken();
-        this.compileIdentifier();
+        this.compileIdentifier('class', 'declaration');
 
         this.setNextToken();
         this.compileSymbol('{');
@@ -84,35 +91,30 @@ export class CompilationEngine {
         this.output.push(out);
     }
 
-    private compileIdentifier(variable?: { type: string; kind: VariableKind }): void {
+    private compileIdentifier(
+        category: IdentifierCategory,
+        context: IdentifierContext,
+        variable?: { type: string; kind: VariableKind }
+    ): void {
         Validator.validateIdentifier(this.token);
-
-        if (variable) {
-            const table = ['local', 'argument'].includes(variable.kind) ? 'subroutine' : 'class';
-            const toAdd = { ...variable, name: this.token.value.toString() };
-            const added = table === 'subroutine' ? this.subroutineVarTable.add(toAdd) : this.classVarTable.add(toAdd);
-
-            this.writeOutput('<identifier>');
-            this.increaseIndent();
-
-            this.writeOutput('<isVariable>true</isVariable>');
-            this.writeOutput(`<value>${this.token.value}</value>`);
-            this.writeOutput(`<type>${variable.type}</type>`);
-            this.writeOutput(`<kind>${variable.kind}</kind>`);
-            this.writeOutput(`<varTable>${table}</varTable>`);
-            this.writeOutput(`<varTableIndex>${added.index}</varTableIndex>`);
-
-            this.decreaseIndent();
-            this.writeOutput('</identifier>');
-
-            return;
-        }
 
         this.writeOutput('<identifier>');
         this.increaseIndent();
 
-        this.writeOutput('<isVariable>false</isVariable>');
+        this.writeOutput(`<category>${category}</category>`);
+        this.writeOutput(`<context>${context}</context>`);
         this.writeOutput(`<value>${this.token.value}</value>`);
+
+        if (category === 'variable' && variable) {
+            const table = ['local', 'argument'].includes(variable.kind) ? 'subroutine' : 'class';
+            const toAdd = { ...variable, name: this.token.value.toString() };
+            const added = table === 'subroutine' ? this.subroutineVarTable.add(toAdd) : this.classVarTable.add(toAdd);
+
+            this.writeOutput(`<type>${variable.type}</type>`);
+            this.writeOutput(`<kind>${variable.kind}</kind>`);
+            this.writeOutput(`<varTable>${table}</varTable>`);
+            this.writeOutput(`<varTableIndex>${added.index}</varTableIndex>`);
+        }
 
         this.decreaseIndent();
         this.writeOutput('</identifier>');
@@ -176,7 +178,7 @@ export class CompilationEngine {
         this.compileSubroutineReturnType();
 
         this.setNextToken();
-        this.compileIdentifier();
+        this.compileIdentifier('subroutine', 'declaration');
 
         this.setNextToken();
         this.compileSymbol('(');
@@ -218,7 +220,7 @@ export class CompilationEngine {
         this.compileType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.compileIdentifier({ type, kind: 'argument' });
+        this.compileIdentifier('variable', 'usage', { type, kind: 'argument' });
     }
 
     private compileSubroutineBody(): void {
@@ -262,7 +264,7 @@ export class CompilationEngine {
         this.compileType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.compileIdentifier({ type, kind });
+        this.compileIdentifier('variable', 'declaration', { type, kind });
 
         let semicolonReached: boolean = false;
         while (!semicolonReached) {
@@ -271,7 +273,7 @@ export class CompilationEngine {
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeOutput();
                 this.setNextToken();
-                this.compileIdentifier({ type, kind });
+                this.compileIdentifier('variable', 'declaration', { type, kind });
                 continue;
             }
 
@@ -326,7 +328,7 @@ export class CompilationEngine {
         this.compileKeyword('let');
 
         this.setNextToken();
-        this.compileIdentifier();
+        this.compileIdentifier('variable', 'definition');
 
         this.setNextToken();
         if (this.token.value !== '=') {
@@ -524,7 +526,9 @@ export class CompilationEngine {
     }
 
     private compileSubroutineCall(): void {
-        this.compileIdentifier();
+        const tokenAhead: Token = this.tokenizer.lookAhead();
+        const category = tokenAhead.value === '(' ? 'subroutine' : 'class';
+        this.compileIdentifier(category, 'usage');
 
         this.setNextToken();
         this.compileOneOfSymbols(['(', '.']);
@@ -537,7 +541,7 @@ export class CompilationEngine {
         }
 
         this.setNextToken();
-        this.compileIdentifier();
+        this.compileIdentifier('subroutine', 'usage');
 
         this.setNextToken();
         this.compileSymbol('(');
