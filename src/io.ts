@@ -2,21 +2,21 @@ import { createReadStream, createWriteStream, readdirSync, statSync, Stats } fro
 import path, { ParsedPath } from 'path';
 import { createInterface } from 'readline';
 
-export interface File {
+export type File = {
     name: string;
     extension: string;
     dir: string;
     data: string[];
-}
+};
 
-export interface PathInfo {
+export type PathInfo = {
     input: string;
     parsed: ParsedPath;
     stats: Stats;
-}
+};
 
 export class IO {
-    public static readFile(filePath: string): Promise<string[]> {
+    static readFile(filePath: string): Promise<string[]> {
         return new Promise((resolve) => {
             const data: string[] = [];
 
@@ -33,7 +33,7 @@ export class IO {
         });
     }
 
-    public static async readFiles(args: string[]): Promise<File[]> {
+    static async readFiles(args: string[]): Promise<File[]> {
         const pathInfo = IO.getPathInfo(args[0]);
 
         if (IO.isJackFile(pathInfo)) {
@@ -65,7 +65,7 @@ export class IO {
         throw new Error('Path argument is not valid (must be either a .jack file or an existing directory)');
     }
 
-    public static writeFile(file: File): void {
+    static writeFile(file: File): void {
         const wstream = createWriteStream(`${file.dir}/${file.name}.${file.extension}`);
 
         for (const line of file.data) {
@@ -73,7 +73,7 @@ export class IO {
         }
     }
 
-    public static writeFiles(files: File[]): void {
+    static writeFiles(files: File[]): void {
         for (const file of files) {
             IO.writeFile(file);
         }

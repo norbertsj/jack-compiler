@@ -1,3 +1,4 @@
+import { CompilerOutput } from './compiler';
 import {
     IdentifierCategory,
     IdentifierContext,
@@ -16,7 +17,7 @@ export class CompilationEngine {
     private readonly tokenizer: Tokenizer;
     private readonly vmWriter: VMWriter;
     private token: Token;
-    private output: string[] = [];
+    private output: CompilerOutput = { tokens: [], xml: [], vm: [] };
     private classVarTable: VariableTable;
     private subroutineVarTable: VariableTable;
     private indent = 0;
@@ -28,8 +29,10 @@ export class CompilationEngine {
         this.subroutineVarTable = new VariableTable();
     }
 
-    compileClass(): void {
-        this.writeOutput('<class>');
+    compile(): void {
+        this.output.tokens = this.tokenizer.getTokens();
+
+        this.writeXML('<class>');
         this.increaseIndent();
 
         this.setNextToken();
@@ -61,10 +64,10 @@ export class CompilationEngine {
         }
 
         this.decreaseIndent();
-        this.writeOutput('</class>');
+        this.writeXML('</class>');
     }
 
-    getOutput(): string[] {
+    getOutput(): CompilerOutput {
         return this.output;
     }
 
@@ -81,14 +84,14 @@ export class CompilationEngine {
         this.token = this.tokenizer.look();
     }
 
-    private writeOutput(xmlString: string = undefined): void {
+    private writeXML(xmlString: string = undefined): void {
         let out = xmlString || this.token.xml;
 
         if (this.indent > 0) {
             out = out.padStart(out.length + this.indent * INDENT_SIZE);
         }
 
-        this.output.push(out);
+        this.output.xml.push(out);
     }
 
     private compileIdentifier(
@@ -98,65 +101,65 @@ export class CompilationEngine {
     ): void {
         Validator.validateIdentifier(this.token);
 
-        this.writeOutput('<identifier>');
+        this.writeXML('<identifier>');
         this.increaseIndent();
 
-        this.writeOutput(`<category>${category}</category>`);
-        this.writeOutput(`<context>${context}</context>`);
-        this.writeOutput(`<value>${this.token.value}</value>`);
+        this.writeXML(`<category>${category}</category>`);
+        this.writeXML(`<context>${context}</context>`);
+        this.writeXML(`<value>${this.token.value}</value>`);
 
         if (category === 'variable' && variable) {
             const table = ['local', 'argument'].includes(variable.kind) ? 'subroutine' : 'class';
             const toAdd = { ...variable, name: this.token.value.toString() };
             const added = table === 'subroutine' ? this.subroutineVarTable.add(toAdd) : this.classVarTable.add(toAdd);
 
-            this.writeOutput(`<type>${variable.type}</type>`);
-            this.writeOutput(`<kind>${variable.kind}</kind>`);
-            this.writeOutput(`<varTable>${table}</varTable>`);
-            this.writeOutput(`<varTableIndex>${added.index}</varTableIndex>`);
+            this.writeXML(`<type>${variable.type}</type>`);
+            this.writeXML(`<kind>${variable.kind}</kind>`);
+            this.writeXML(`<varTable>${table}</varTable>`);
+            this.writeXML(`<varTableIndex>${added.index}</varTableIndex>`);
         }
 
         this.decreaseIndent();
-        this.writeOutput('</identifier>');
+        this.writeXML('</identifier>');
     }
 
     private compileKeyword(keyword: string): void {
         Validator.validateKeyword(this.token, keyword);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileOneOfKeywords(keywords: string[]): void {
         Validator.validateKeywords(this.token, keywords);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileSymbol(symbol: string): void {
         Validator.validateSymbol(this.token, symbol);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileOneOfSymbols(symbols: string[]): void {
         Validator.validateSymbols(this.token, symbols);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileType(): void {
         Validator.validateType(this.token);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileSubroutineReturnType(): void {
         Validator.validateSubroutineReturnType(this.token);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileInteger(): void {
         Validator.validateIntegerValue(this.token);
-        this.writeOutput();
+        this.writeXML();
     }
 
     private compileClassVarDec(): void {
-        this.writeOutput('<classVarDec>');
+        this.writeXML('<classVarDec>');
         this.increaseIndent();
 
         this.compileOneOfKeywords(['field', 'static']);
@@ -165,11 +168,11 @@ export class CompilationEngine {
         this.compileVarDec(<VariableKind>kind);
 
         this.decreaseIndent();
-        this.writeOutput('</classVarDec>');
+        this.writeXML('</classVarDec>');
     }
 
     private compileSubroutineDec(): void {
-        this.writeOutput('<subroutineDec>');
+        this.writeXML('<subroutineDec>');
         this.increaseIndent();
 
         this.compileOneOfKeywords(['constructor', 'method', 'function']);
@@ -191,12 +194,12 @@ export class CompilationEngine {
         this.compileSubroutineBody();
 
         this.decreaseIndent();
-        this.writeOutput('</subroutineDec>');
+        this.writeXML('</subroutineDec>');
         this.subroutineVarTable.reset();
     }
 
     private compileParameterList(): void {
-        this.writeOutput('<parameterList>');
+        this.writeXML('<parameterList>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
@@ -206,14 +209,14 @@ export class CompilationEngine {
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
-                this.writeOutput();
+                this.writeXML();
                 this.setNextToken();
                 closingBracketsReached = false; // expecting another parameter
             }
         }
 
         this.decreaseIndent();
-        this.writeOutput('</parameterList>');
+        this.writeXML('</parameterList>');
     }
 
     private compileParameter(): void {
@@ -224,7 +227,7 @@ export class CompilationEngine {
     }
 
     private compileSubroutineBody(): void {
-        this.writeOutput('<subroutineBody>');
+        this.writeXML('<subroutineBody>');
         this.increaseIndent();
 
         this.compileSymbol('{');
@@ -234,7 +237,7 @@ export class CompilationEngine {
         this.compileSymbol('}');
 
         this.decreaseIndent();
-        this.writeOutput('</subroutineBody>');
+        this.writeXML('</subroutineBody>');
     }
 
     private compileSubroutineVars(): void {
@@ -245,7 +248,7 @@ export class CompilationEngine {
     }
 
     private compileSubroutineVarDec(): void {
-        this.writeOutput('<varDec>');
+        this.writeXML('<varDec>');
         this.increaseIndent();
 
         this.compileKeyword('var');
@@ -253,7 +256,7 @@ export class CompilationEngine {
         this.compileVarDec('local');
 
         this.decreaseIndent();
-        this.writeOutput('</varDec>');
+        this.writeXML('</varDec>');
     }
 
     /**
@@ -271,7 +274,7 @@ export class CompilationEngine {
             this.setNextToken();
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
-                this.writeOutput();
+                this.writeXML();
                 this.setNextToken();
                 this.compileIdentifier('variable', 'declaration', { type, kind });
                 continue;
@@ -287,7 +290,7 @@ export class CompilationEngine {
      * (after execution the "setNextToken" method call is not needed)
      */
     private compileStatements(): void {
-        this.writeOutput('<statements>');
+        this.writeXML('<statements>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === '}';
@@ -319,11 +322,11 @@ export class CompilationEngine {
         }
 
         this.decreaseIndent();
-        this.writeOutput('</statements>');
+        this.writeXML('</statements>');
     }
 
     private compileLet(): void {
-        this.writeOutput('<letStatement>');
+        this.writeXML('<letStatement>');
         this.increaseIndent();
         this.compileKeyword('let');
 
@@ -348,11 +351,11 @@ export class CompilationEngine {
         this.compileSymbol(';');
 
         this.decreaseIndent();
-        this.writeOutput('</letStatement>');
+        this.writeXML('</letStatement>');
     }
 
     private compileIf(): void {
-        this.writeOutput('<ifStatement>');
+        this.writeXML('<ifStatement>');
         this.increaseIndent();
 
         this.compileKeyword('if');
@@ -385,11 +388,11 @@ export class CompilationEngine {
         }
 
         this.decreaseIndent();
-        this.writeOutput('</ifStatement>');
+        this.writeXML('</ifStatement>');
     }
 
     private compileWhile(): void {
-        this.writeOutput('<whileStatement>');
+        this.writeXML('<whileStatement>');
         this.increaseIndent();
 
         this.compileKeyword('while');
@@ -409,11 +412,11 @@ export class CompilationEngine {
         this.compileSymbol('}');
 
         this.decreaseIndent();
-        this.writeOutput('</whileStatement>');
+        this.writeXML('</whileStatement>');
     }
 
     private compileDo(): void {
-        this.writeOutput('<doStatement>');
+        this.writeXML('<doStatement>');
         this.increaseIndent();
 
         this.compileKeyword('do');
@@ -425,11 +428,11 @@ export class CompilationEngine {
         this.compileSymbol(';');
 
         this.decreaseIndent();
-        this.writeOutput('</doStatement>');
+        this.writeXML('</doStatement>');
     }
 
     private compileReturn(): void {
-        this.writeOutput('<returnStatement>');
+        this.writeXML('<returnStatement>');
         this.increaseIndent();
 
         this.compileKeyword('return');
@@ -442,7 +445,7 @@ export class CompilationEngine {
         this.compileSymbol(';');
 
         this.decreaseIndent();
-        this.writeOutput('</returnStatement>');
+        this.writeXML('</returnStatement>');
     }
 
     /**
@@ -450,25 +453,25 @@ export class CompilationEngine {
      * (after execution the "setNextToken" method call is not needed)
      */
     private compileExpression(): void {
-        this.writeOutput('<expression>');
+        this.writeXML('<expression>');
         this.increaseIndent();
 
         this.compileTerm();
 
         this.setNextToken();
         while (this.token.type === 'SYMBOL' && OPERATORS.includes(this.token.value as string)) {
-            this.writeOutput();
+            this.writeXML();
             this.setNextToken();
             this.compileTerm();
             this.setNextToken();
         }
 
         this.decreaseIndent();
-        this.writeOutput('</expression>');
+        this.writeXML('</expression>');
     }
 
     private compileTerm(): void {
-        this.writeOutput('<term>');
+        this.writeXML('<term>');
         this.increaseIndent();
 
         switch (this.token.type) {
@@ -476,7 +479,7 @@ export class CompilationEngine {
                 this.compileInteger();
                 break;
             case 'STRING_CONST':
-                this.writeOutput();
+                this.writeXML();
                 break;
             case 'KEYWORD':
                 this.compileOneOfKeywords(KEYWORD_CONSTANTS);
@@ -485,7 +488,7 @@ export class CompilationEngine {
                 const tokenAhead: Token = this.tokenizer.lookAhead();
 
                 if (tokenAhead?.value === '[') {
-                    this.writeOutput();
+                    this.writeXML();
 
                     this.setNextToken();
                     this.compileSymbol('[');
@@ -502,7 +505,7 @@ export class CompilationEngine {
                     break;
                 }
 
-                this.writeOutput();
+                this.writeXML();
                 break;
             case 'SYMBOL':
                 if (this.token.value === '(') {
@@ -522,7 +525,7 @@ export class CompilationEngine {
         }
 
         this.decreaseIndent();
-        this.writeOutput('</term>');
+        this.writeXML('</term>');
     }
 
     private compileSubroutineCall(): void {
@@ -556,7 +559,7 @@ export class CompilationEngine {
      * (after execution the "setNextToken" method call is not needed)
      */
     private compileExpressionList(): void {
-        this.writeOutput('<expressionList>');
+        this.writeXML('<expressionList>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
@@ -565,13 +568,13 @@ export class CompilationEngine {
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
-                this.writeOutput();
+                this.writeXML();
                 this.setNextToken();
                 closingBracketsReached = false; // expecting another expression
             }
         }
 
         this.decreaseIndent();
-        this.writeOutput('</expressionList>');
+        this.writeXML('</expressionList>');
     }
 }

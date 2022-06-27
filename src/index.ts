@@ -1,29 +1,17 @@
+import { Compiler } from './compiler';
 import { File, IO } from './io';
-import { Tokenizer } from './tokenizer';
-import { CompilationEngine } from './engine';
-
-export default class SyntaxAnalyser {
-    public static getClassTokens(input: string[]): string[] {
-        const tokenizer = new Tokenizer(input);
-        return tokenizer.getTokens();
-    }
-
-    public static getClass(input: string[]): string[] {
-        const engine = new CompilationEngine(input);
-        engine.compileClass();
-        return engine.getOutput();
-    }
-}
 
 function compileFiles(files: File[], args: string[]) {
     const compiledFiles: File[] = [];
 
     for (const file of files) {
+        const { tokens, xml, vm } = Compiler.compile(file.data);
+
         compiledFiles.push({
             name: file.name,
             extension: 'vm',
             dir: file.dir,
-            data: [],
+            data: vm,
         });
 
         if (args.includes('--syntax-tree')) {
@@ -31,7 +19,7 @@ function compileFiles(files: File[], args: string[]) {
                 name: file.name,
                 extension: 'xml',
                 dir: file.dir,
-                data: SyntaxAnalyser.getClass(file.data),
+                data: xml,
             });
         }
 
@@ -40,7 +28,7 @@ function compileFiles(files: File[], args: string[]) {
                 name: file.name + 'T',
                 extension: 'xml',
                 dir: file.dir,
-                data: SyntaxAnalyser.getClassTokens(file.data),
+                data: tokens,
             });
         }
     }
