@@ -1,48 +1,42 @@
-import { CompilerOutput } from './compiler';
-import {
-    IdentifierCategory,
-    IdentifierContext,
-    INDENT_SIZE,
-    KEYWORD_CONSTANTS,
-    OPERATORS,
-    UNARY_OPERATORS,
-} from './defines';
+import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from './constants';
+import { IdentifierCategory, IdentifierContext } from './identifier';
 import { Token } from './token';
 import { Tokenizer } from './tokenizer';
 import { Validator } from './validator';
 import { VariableKind, VariableTable } from './variable-table';
-import { VMWriter } from './vm-writer';
 
-export class CompilationEngine {
+export type ParserOutput = {
+    tokens: string[];
+    parseTree: string[];
+};
+
+export class Parser {
     private readonly tokenizer: Tokenizer;
-    private readonly vmWriter: VMWriter;
     private token: Token;
-    private output: CompilerOutput = { tokens: [], xml: [], vm: [] };
+    private output: ParserOutput = { tokens: [], parseTree: [] };
     private classVarTable: VariableTable;
     private subroutineVarTable: VariableTable;
     private indent = 0;
 
     constructor(input: string[]) {
         this.tokenizer = new Tokenizer(input);
-        this.vmWriter = new VMWriter();
         this.classVarTable = new VariableTable();
         this.subroutineVarTable = new VariableTable();
+        this.output.tokens = this.tokenizer.getTokens();
     }
 
-    compile(): void {
-        this.output.tokens = this.tokenizer.getTokens();
-
+    parseClass(): void {
         this.writeXML('<class>');
         this.increaseIndent();
 
         this.setNextToken();
-        this.compileKeyword('class');
+        this.parseKeyword('class');
 
         this.setNextToken();
-        this.compileIdentifier('class', 'declaration');
+        this.parseIdentifier('class', 'declaration');
 
         this.setNextToken();
-        this.compileSymbol('{');
+        this.parseSymbol('{');
 
         while (this.tokenizer.hasMoreTokens()) {
             this.setNextToken();
@@ -50,15 +44,15 @@ export class CompilationEngine {
             switch (this.token.value) {
                 case 'static':
                 case 'field':
-                    this.compileClassVarDec();
+                    this.parseClassVarDec();
                     break;
                 case 'constructor':
                 case 'function':
                 case 'method':
-                    this.compileSubroutineDec();
+                    this.parseSubroutineDec();
                     break;
                 default:
-                    this.compileSymbol('}');
+                    this.parseSymbol('}');
                     break;
             }
         }
@@ -67,7 +61,7 @@ export class CompilationEngine {
         this.writeXML('</class>');
     }
 
-    getOutput(): CompilerOutput {
+    getOutput(): ParserOutput {
         return this.output;
     }
 
@@ -91,10 +85,10 @@ export class CompilationEngine {
             out = out.padStart(out.length + this.indent * INDENT_SIZE);
         }
 
-        this.output.xml.push(out);
+        this.output.parseTree.push(out);
     }
 
-    private compileIdentifier(
+    private parseIdentifier(
         category: IdentifierCategory,
         context: IdentifierContext,
         variable?: { type: string; kind: VariableKind }
@@ -123,88 +117,90 @@ export class CompilationEngine {
         this.writeXML('</identifier>');
     }
 
-    private compileKeyword(keyword: string): void {
+    private parseKeyword(keyword: string): void {
         Validator.validateKeyword(this.token, keyword);
         this.writeXML();
     }
 
-    private compileOneOfKeywords(keywords: string[]): void {
+    private parseOneOfKeywords(keywords: string[]): void {
         Validator.validateKeywords(this.token, keywords);
         this.writeXML();
     }
 
-    private compileSymbol(symbol: string): void {
+    private parseSymbol(symbol: string): void {
         Validator.validateSymbol(this.token, symbol);
         this.writeXML();
     }
 
-    private compileOneOfSymbols(symbols: string[]): void {
+    private parseOneOfSymbols(symbols: string[]): void {
         Validator.validateSymbols(this.token, symbols);
         this.writeXML();
     }
 
-    private compileType(): void {
+    private parseType(): void {
         Validator.validateType(this.token);
         this.writeXML();
     }
 
-    private compileSubroutineReturnType(): void {
+    private parseSubroutineReturnType(): void {
         Validator.validateSubroutineReturnType(this.token);
         this.writeXML();
     }
 
-    private compileInteger(): void {
+    private parseInteger(): void {
         Validator.validateIntegerValue(this.token);
         this.writeXML();
     }
 
-    private compileClassVarDec(): void {
+    private parseClassVarDec(): void {
         this.writeXML('<classVarDec>');
         this.increaseIndent();
 
-        this.compileOneOfKeywords(['field', 'static']);
+        this.parseOneOfKeywords(['field', 'static']);
         const kind = this.token.value;
         this.setNextToken();
-        this.compileVarDec(<VariableKind>kind);
+        this.parseVarDec(<VariableKind>kind);
 
         this.decreaseIndent();
         this.writeXML('</classVarDec>');
     }
 
-    private compileSubroutineDec(): void {
+    private parseSubroutineDec(): void {
         this.writeXML('<subroutineDec>');
         this.increaseIndent();
 
-        this.compileOneOfKeywords(['constructor', 'method', 'function']);
+        this.parseOneOfKeywords(['constructor', 'method', 'function']);
 
         this.setNextToken();
-        this.compileSubroutineReturnType();
+        this.parseSubroutineReturnType();
 
         this.setNextToken();
-        this.compileIdentifier('subroutine', 'declaration');
+        this.parseIdentifier('subroutine', 'declaration');
 
         this.setNextToken();
-        this.compileSymbol('(');
+        this.parseSymbol('(');
 
         this.setNextToken();
-        this.compileParameterList();
-        this.compileSymbol(')');
+        this.parseParameterList();
+        this.parseSymbol(')');
 
         this.setNextToken();
-        this.compileSubroutineBody();
+        this.parseSubroutineBody();
+
+        this.addVariableData();
 
         this.decreaseIndent();
         this.writeXML('</subroutineDec>');
         this.subroutineVarTable.reset();
     }
 
-    private compileParameterList(): void {
+    private parseParameterList(): void {
         this.writeXML('<parameterList>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
         while (!closingBracketsReached) {
-            this.compileParameter();
+            this.parseParameter();
             this.setNextToken();
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
@@ -219,55 +215,55 @@ export class CompilationEngine {
         this.writeXML('</parameterList>');
     }
 
-    private compileParameter(): void {
-        this.compileType();
+    private parseParameter(): void {
+        this.parseType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.compileIdentifier('variable', 'usage', { type, kind: 'argument' });
+        this.parseIdentifier('variable', 'usage', { type, kind: 'argument' });
     }
 
-    private compileSubroutineBody(): void {
+    private parseSubroutineBody(): void {
         this.writeXML('<subroutineBody>');
         this.increaseIndent();
 
-        this.compileSymbol('{');
+        this.parseSymbol('{');
         this.setNextToken();
-        this.compileSubroutineVars();
-        this.compileStatements();
-        this.compileSymbol('}');
+        this.parseSubroutineVars();
+        this.parseStatements();
+        this.parseSymbol('}');
 
         this.decreaseIndent();
         this.writeXML('</subroutineBody>');
     }
 
-    private compileSubroutineVars(): void {
+    private parseSubroutineVars(): void {
         while (this.token.type === 'KEYWORD' && this.token.value === 'var') {
-            this.compileSubroutineVarDec();
+            this.parseSubroutineVarDec();
             this.setNextToken();
         }
     }
 
-    private compileSubroutineVarDec(): void {
+    private parseSubroutineVarDec(): void {
         this.writeXML('<varDec>');
         this.increaseIndent();
 
-        this.compileKeyword('var');
+        this.parseKeyword('var');
         this.setNextToken();
-        this.compileVarDec('local');
+        this.parseVarDec('local');
 
         this.decreaseIndent();
         this.writeXML('</varDec>');
     }
 
     /**
-     * compiles "type varName (','varName)* ';'"
+     * parses "type varName (','varName)* ';'"
      * which is used in "classVarDec" and "varDec" rule structures
      */
-    private compileVarDec(kind: VariableKind): void {
-        this.compileType();
+    private parseVarDec(kind: VariableKind): void {
+        this.parseType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.compileIdentifier('variable', 'declaration', { type, kind });
+        this.parseIdentifier('variable', 'declaration', { type, kind });
 
         let semicolonReached: boolean = false;
         while (!semicolonReached) {
@@ -276,20 +272,20 @@ export class CompilationEngine {
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeXML();
                 this.setNextToken();
-                this.compileIdentifier('variable', 'declaration', { type, kind });
+                this.parseIdentifier('variable', 'declaration', { type, kind });
                 continue;
             }
 
-            this.compileSymbol(';');
+            this.parseSymbol(';');
             semicolonReached = true;
         }
     }
 
     /**
-     * compiles statements
+     * parses statements
      * (after execution the "setNextToken" method call is not needed)
      */
-    private compileStatements(): void {
+    private parseStatements(): void {
         this.writeXML('<statements>');
         this.increaseIndent();
 
@@ -297,19 +293,19 @@ export class CompilationEngine {
         while (!closingBracketsReached) {
             switch (this.token.value) {
                 case 'let':
-                    this.compileLet();
+                    this.parseLet();
                     break;
                 case 'if':
-                    this.compileIf();
+                    this.parseIf();
                     break;
                 case 'while':
-                    this.compileWhile();
+                    this.parseWhile();
                     break;
                 case 'do':
-                    this.compileDo();
+                    this.parseDo();
                     break;
                 case 'return':
-                    this.compileReturn();
+                    this.parseReturn();
                     break;
                 default:
                     closingBracketsReached = true;
@@ -325,144 +321,144 @@ export class CompilationEngine {
         this.writeXML('</statements>');
     }
 
-    private compileLet(): void {
+    private parseLet(): void {
         this.writeXML('<letStatement>');
         this.increaseIndent();
-        this.compileKeyword('let');
+        this.parseKeyword('let');
 
         this.setNextToken();
-        this.compileIdentifier('variable', 'definition');
+        this.parseIdentifier('variable', 'definition');
 
         this.setNextToken();
         if (this.token.value !== '=') {
-            this.compileSymbol('[');
+            this.parseSymbol('[');
 
             this.setNextToken();
-            this.compileExpression();
-            this.compileSymbol(']');
+            this.parseExpression();
+            this.parseSymbol(']');
 
             this.setNextToken();
         }
 
-        this.compileSymbol('=');
+        this.parseSymbol('=');
 
         this.setNextToken();
-        this.compileExpression();
-        this.compileSymbol(';');
+        this.parseExpression();
+        this.parseSymbol(';');
 
         this.decreaseIndent();
         this.writeXML('</letStatement>');
     }
 
-    private compileIf(): void {
+    private parseIf(): void {
         this.writeXML('<ifStatement>');
         this.increaseIndent();
 
-        this.compileKeyword('if');
+        this.parseKeyword('if');
 
         this.setNextToken();
-        this.compileSymbol('(');
+        this.parseSymbol('(');
 
         this.setNextToken();
-        this.compileExpression();
-        this.compileSymbol(')');
+        this.parseExpression();
+        this.parseSymbol(')');
 
         this.setNextToken();
-        this.compileSymbol('{');
+        this.parseSymbol('{');
 
         this.setNextToken();
-        this.compileStatements();
-        this.compileSymbol('}');
+        this.parseStatements();
+        this.parseSymbol('}');
 
         const tokenAhead: Token = this.tokenizer.lookAhead();
         if (tokenAhead?.value === 'else') {
             this.setNextToken();
-            this.compileKeyword('else');
+            this.parseKeyword('else');
 
             this.setNextToken();
-            this.compileSymbol('{');
+            this.parseSymbol('{');
 
             this.setNextToken();
-            this.compileStatements();
-            this.compileSymbol('}');
+            this.parseStatements();
+            this.parseSymbol('}');
         }
 
         this.decreaseIndent();
         this.writeXML('</ifStatement>');
     }
 
-    private compileWhile(): void {
+    private parseWhile(): void {
         this.writeXML('<whileStatement>');
         this.increaseIndent();
 
-        this.compileKeyword('while');
+        this.parseKeyword('while');
 
         this.setNextToken();
-        this.compileSymbol('(');
+        this.parseSymbol('(');
 
         this.setNextToken();
-        this.compileExpression();
-        this.compileSymbol(')');
+        this.parseExpression();
+        this.parseSymbol(')');
 
         this.setNextToken();
-        this.compileSymbol('{');
+        this.parseSymbol('{');
 
         this.setNextToken();
-        this.compileStatements();
-        this.compileSymbol('}');
+        this.parseStatements();
+        this.parseSymbol('}');
 
         this.decreaseIndent();
         this.writeXML('</whileStatement>');
     }
 
-    private compileDo(): void {
+    private parseDo(): void {
         this.writeXML('<doStatement>');
         this.increaseIndent();
 
-        this.compileKeyword('do');
+        this.parseKeyword('do');
 
         this.setNextToken();
-        this.compileSubroutineCall();
+        this.parseSubroutineCall();
 
         this.setNextToken();
-        this.compileSymbol(';');
+        this.parseSymbol(';');
 
         this.decreaseIndent();
         this.writeXML('</doStatement>');
     }
 
-    private compileReturn(): void {
+    private parseReturn(): void {
         this.writeXML('<returnStatement>');
         this.increaseIndent();
 
-        this.compileKeyword('return');
+        this.parseKeyword('return');
 
         this.setNextToken();
         if (this.token.value !== ';') {
-            this.compileExpression();
+            this.parseExpression();
         }
 
-        this.compileSymbol(';');
+        this.parseSymbol(';');
 
         this.decreaseIndent();
         this.writeXML('</returnStatement>');
     }
 
     /**
-     * compiles expression
+     * parses expression
      * (after execution the "setNextToken" method call is not needed)
      */
-    private compileExpression(): void {
+    private parseExpression(): void {
         this.writeXML('<expression>');
         this.increaseIndent();
 
-        this.compileTerm();
+        this.parseTerm();
 
         this.setNextToken();
         while (this.token.type === 'SYMBOL' && OPERATORS.includes(this.token.value as string)) {
             this.writeXML();
             this.setNextToken();
-            this.compileTerm();
+            this.parseTerm();
             this.setNextToken();
         }
 
@@ -470,19 +466,19 @@ export class CompilationEngine {
         this.writeXML('</expression>');
     }
 
-    private compileTerm(): void {
+    private parseTerm(): void {
         this.writeXML('<term>');
         this.increaseIndent();
 
         switch (this.token.type) {
             case 'INT_CONST':
-                this.compileInteger();
+                this.parseInteger();
                 break;
             case 'STRING_CONST':
                 this.writeXML();
                 break;
             case 'KEYWORD':
-                this.compileOneOfKeywords(KEYWORD_CONSTANTS);
+                this.parseOneOfKeywords(KEYWORD_CONSTANTS);
                 break;
             case 'IDENTIFIER':
                 const tokenAhead: Token = this.tokenizer.lookAhead();
@@ -491,17 +487,17 @@ export class CompilationEngine {
                     this.writeXML();
 
                     this.setNextToken();
-                    this.compileSymbol('[');
+                    this.parseSymbol('[');
 
                     this.setNextToken();
-                    this.compileExpression();
+                    this.parseExpression();
 
-                    this.compileSymbol(']');
+                    this.parseSymbol(']');
                     break;
                 }
 
                 if (tokenAhead?.value === '(' || tokenAhead?.value === '.') {
-                    this.compileSubroutineCall();
+                    this.parseSubroutineCall();
                     break;
                 }
 
@@ -509,18 +505,18 @@ export class CompilationEngine {
                 break;
             case 'SYMBOL':
                 if (this.token.value === '(') {
-                    this.compileSymbol('(');
+                    this.parseSymbol('(');
 
                     this.setNextToken();
-                    this.compileExpression();
+                    this.parseExpression();
 
-                    this.compileSymbol(')');
+                    this.parseSymbol(')');
                     break;
                 }
 
-                this.compileOneOfSymbols(UNARY_OPERATORS);
+                this.parseOneOfSymbols(UNARY_OPERATORS);
                 this.setNextToken();
-                this.compileTerm();
+                this.parseTerm();
                 break;
         }
 
@@ -528,43 +524,43 @@ export class CompilationEngine {
         this.writeXML('</term>');
     }
 
-    private compileSubroutineCall(): void {
+    private parseSubroutineCall(): void {
         const tokenAhead: Token = this.tokenizer.lookAhead();
         const category = tokenAhead.value === '(' ? 'subroutine' : 'class';
-        this.compileIdentifier(category, 'usage');
+        this.parseIdentifier(category, 'usage');
 
         this.setNextToken();
-        this.compileOneOfSymbols(['(', '.']);
+        this.parseOneOfSymbols(['(', '.']);
 
         if (this.token.value === '(') {
             this.setNextToken();
-            this.compileExpressionList();
-            this.compileSymbol(')');
+            this.parseExpressionList();
+            this.parseSymbol(')');
             return;
         }
 
         this.setNextToken();
-        this.compileIdentifier('subroutine', 'usage');
+        this.parseIdentifier('subroutine', 'usage');
 
         this.setNextToken();
-        this.compileSymbol('(');
+        this.parseSymbol('(');
 
         this.setNextToken();
-        this.compileExpressionList();
-        this.compileSymbol(')');
+        this.parseExpressionList();
+        this.parseSymbol(')');
     }
 
     /**
-     * compiles a list of comma separated expressions
+     * parses a list of comma separated expressions
      * (after execution the "setNextToken" method call is not needed)
      */
-    private compileExpressionList(): void {
+    private parseExpressionList(): void {
         this.writeXML('<expressionList>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
         while (!closingBracketsReached) {
-            this.compileExpression();
+            this.parseExpression();
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
@@ -576,5 +572,16 @@ export class CompilationEngine {
 
         this.decreaseIndent();
         this.writeXML('</expressionList>');
+    }
+
+    private addVariableData(): void {
+        this.writeXML('<variableData>');
+        this.increaseIndent();
+
+        this.writeXML(`<nArgs>${this.subroutineVarTable.kindCount('argument')}</nArgs>`);
+        this.writeXML(`<nVars>${this.subroutineVarTable.kindCount('local')}</nVars>`);
+
+        this.decreaseIndent();
+        this.writeXML('</variableData>');
     }
 }

@@ -1,15 +1,14 @@
-import { CompilationEngine } from './engine';
+import { SyntaxAnalyser } from './analyser';
 
 export type CompilerOutput = {
     tokens: string[];
-    xml: string[];
+    parseTree: string[];
     vm: string[];
 };
 
 export class Compiler {
     static compile(input: string[]): CompilerOutput {
-        const engine = new CompilationEngine(input);
-        engine.compile();
-        return engine.getOutput();
+        const { tokens, parseTree } = SyntaxAnalyser.analyseClass(input);
+        return { tokens, parseTree, vm: [] };
     }
 }

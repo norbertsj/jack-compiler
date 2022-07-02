@@ -34,7 +34,7 @@ export class VariableTable {
         this.variables = [];
     }
 
-    private kindCount(kind: VariableKind): number {
+    kindCount(kind: VariableKind): number {
         return this.variables.filter((v) => v.kind === kind).length;
     }
 

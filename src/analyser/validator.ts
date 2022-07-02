@@ -1,5 +1,5 @@
 import { Token } from './token';
-import { TYPES, INTEGER_MIN, INTEGER_MAX } from './defines';
+import { TYPES, INTEGER_MIN, INTEGER_MAX } from './constants';
 
 export class Validator {
     static validateIdentifier(token: Token): void {

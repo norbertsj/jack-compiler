@@ -1,4 +1,4 @@
-import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from './defines';
+import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from './constants';
 import { Token } from './token';
 
 export class Tokenizer {

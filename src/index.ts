@@ -5,7 +5,7 @@ function compileFiles(files: File[], args: string[]) {
     const compiledFiles: File[] = [];
 
     for (const file of files) {
-        const { tokens, xml, vm } = Compiler.compile(file.data);
+        const { tokens, parseTree, vm } = Compiler.compile(file.data);
 
         compiledFiles.push({
             name: file.name,
@@ -14,12 +14,12 @@ function compileFiles(files: File[], args: string[]) {
             data: vm,
         });
 
-        if (args.includes('--syntax-tree')) {
+        if (args.includes('--parse-tree')) {
             compiledFiles.push({
                 name: file.name,
                 extension: 'xml',
                 dir: file.dir,
-                data: xml,
+                data: parseTree,
             });
         }
 
