@@ -9,10 +9,12 @@
         "build": "tsc",
         "test": "node build/index test/Seven --parse-tree --tokens"
     },
-    "dependencies": {},
+    "dependencies": {
+        "sha3": "^2.1.4"
+    },
     "devDependencies": {
+        "@types/node": "^16.11.9",
         "prettier": "^2.4.1",
-        "typescript": "^4.4.3",
-        "@types/node": "^16.11.9"
+        "typescript": "^4.4.3"
     }
 }

@@ -2,6 +2,7 @@ import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from './co
 import { IdentifierCategory, IdentifierContext } from './identifier';
 import { Token } from './token';
 import { Tokenizer } from './tokenizer';
+import { Node, NodeValue, Tree } from './tree';
 import { Validator } from './validator';
 import { VariableKind, VariableTable } from './variable-table';
 
@@ -17,6 +18,7 @@ export class Parser {
     private classVarTable: VariableTable;
     private subroutineVarTable: VariableTable;
     private indent = 0;
+    private tree: Tree;
 
     constructor(input: string[]) {
         this.tokenizer = new Tokenizer(input);
@@ -26,43 +28,41 @@ export class Parser {
     }
 
     parseClass(): void {
-        this.writeXML('<class>');
-        this.increaseIndent();
+        this.startParseTree();
 
         this.setNextToken();
-        this.parseKeyword('class');
+        this.parseIdentifier(this.tree.root, 'class', 'declaration');
 
         this.setNextToken();
-        this.parseIdentifier('class', 'declaration');
+        this.parseSymbol(this.tree.root, '{');
 
-        this.setNextToken();
-        this.parseSymbol('{');
-
+        let currentParent: Node = this.tree.root;
         while (this.tokenizer.hasMoreTokens()) {
             this.setNextToken();
 
-            switch (this.token.value) {
-                case 'static':
-                case 'field':
-                    this.parseClassVarDec();
-                    break;
-                case 'constructor':
-                case 'function':
-                case 'method':
-                    this.parseSubroutineDec();
-                    break;
-                default:
-                    this.parseSymbol('}');
-                    break;
+            if (['static', 'field'].includes(this.token.value as string)) {
+                currentParent = this.parseClassVarDec(currentParent);
+                continue;
             }
+
+            if (['constructor', 'function', 'method'].includes(this.token.value as string)) {
+                currentParent = this.parseSubroutineDec(currentParent);
+                continue;
+            }
+
+            this.parseSymbol(this.tree.root, '}');
         }
 
-        this.decreaseIndent();
-        this.writeXML('</class>');
+        this.finishParseTree();
     }
 
     getOutput(): ParserOutput {
+        console.dir(this.tree.root, { depth: null });
         return this.output;
+    }
+
+    private createDummyNode(): Node {
+        return new Node({ type: 'dummy' }, 'dummy');
     }
 
     private increaseIndent() {
@@ -89,10 +89,11 @@ export class Parser {
     }
 
     private parseIdentifier(
+        parent: Node,
         category: IdentifierCategory,
         context: IdentifierContext,
         variable?: { type: string; kind: VariableKind }
-    ): void {
+    ): Node {
         Validator.validateIdentifier(this.token);
 
         this.writeXML('<identifier>');
@@ -101,6 +102,13 @@ export class Parser {
         this.writeXML(`<category>${category}</category>`);
         this.writeXML(`<context>${context}</context>`);
         this.writeXML(`<value>${this.token.value}</value>`);
+
+        const nodeValue: NodeValue = {
+            type: 'identifier',
+            value: this.token.value,
+            category,
+            context,
+        };
 
         if (category === 'variable' && variable) {
             const table = ['local', 'argument'].includes(variable.kind) ? 'subroutine' : 'class';
@@ -111,30 +119,59 @@ export class Parser {
             this.writeXML(`<kind>${variable.kind}</kind>`);
             this.writeXML(`<varTable>${table}</varTable>`);
             this.writeXML(`<varTableIndex>${added.index}</varTableIndex>`);
+
+            nodeValue.props = {
+                type: variable.type,
+                kind: variable.kind,
+                varTable: table,
+                varTableIndex: added.index,
+            };
         }
 
         this.decreaseIndent();
         this.writeXML('</identifier>');
+
+        return parent.addChild(nodeValue);
     }
 
-    private parseKeyword(keyword: string): void {
-        Validator.validateKeyword(this.token, keyword);
+    private startParseTree(): void {
+        this.setNextToken();
+        Validator.validateKeyword(this.token, 'class');
+
+        this.writeXML('<class>');
+        this.increaseIndent();
         this.writeXML();
+
+        this.tree = new Tree({ type: 'keyword', value: 'class' });
     }
 
-    private parseOneOfKeywords(keywords: string[]): void {
+    private finishParseTree(): void {
+        this.decreaseIndent();
+        this.writeXML('</class>');
+    }
+
+    private parseKeyword(parent: Node, value: string): void {
+        Validator.validateKeyword(this.token, value);
+        this.writeXML();
+        parent.addChild({ type: 'keyword', value });
+    }
+
+    private parseOneOfKeywords(parent: Node, keywords: string[]): void {
         Validator.validateKeywords(this.token, keywords);
         this.writeXML();
+        parent.addChild({ type: 'keyword', value: this.token.value });
     }
 
-    private parseSymbol(symbol: string): void {
-        Validator.validateSymbol(this.token, symbol);
+    private parseSymbol(parent: Node, value: string): void {
+        Validator.validateSymbol(this.token, value);
         this.writeXML();
+        parent.addChild({ type: 'symbol', value });
     }
 
-    private parseOneOfSymbols(symbols: string[]): void {
+    private parseOneOfSymbols(parent: Node, symbols: string[]): void {
         Validator.validateSymbols(this.token, symbols);
         this.writeXML();
+        parent.addChild({ type: 'symbol', value: this.token.value });
     }
 
     private parseType(): void {
@@ -142,65 +179,77 @@ export class Parser {
         this.writeXML();
     }
 
-    private parseSubroutineReturnType(): void {
+    private parseSubroutineReturnType(parent: Node): void {
         Validator.validateSubroutineReturnType(this.token);
         this.writeXML();
+        parent.addChild({ type: 'returnType', value: this.token.value });
     }
 
-    private parseInteger(): void {
+    private parseInteger(parent: Node): void {
         Validator.validateIntegerValue(this.token);
         this.writeXML();
+        parent.addChild({ type: 'integer', value: this.token.value });
     }
 
-    private parseClassVarDec(): void {
+    private parseString(parent: Node): void {
+        this.writeXML();
+        parent.addChild({ type: 'string', value: this.token.value });
+    }
+
+    private parseClassVarDec(parent: Node): Node {
         this.writeXML('<classVarDec>');
         this.increaseIndent();
 
-        this.parseOneOfKeywords(['field', 'static']);
+        this.parseOneOfKeywords(this.createDummyNode(), ['field', 'static']);
         const kind = this.token.value;
         this.setNextToken();
         this.parseVarDec(<VariableKind>kind);
 
         this.decreaseIndent();
         this.writeXML('</classVarDec>');
+        return this.createDummyNode();
     }
 
-    private parseSubroutineDec(): void {
+    private parseSubroutineDec(parent: Node): Node {
         this.writeXML('<subroutineDec>');
         this.increaseIndent();
 
-        this.parseOneOfKeywords(['constructor', 'method', 'function']);
+        const subroutineNode = parent.addChild({ type: 'subroutineDec' });
+
+        this.parseOneOfKeywords(subroutineNode, ['constructor', 'method', 'function']);
 
         this.setNextToken();
-        this.parseSubroutineReturnType();
+        this.parseSubroutineReturnType(subroutineNode);
 
         this.setNextToken();
-        this.parseIdentifier('subroutine', 'declaration');
+        this.parseIdentifier(subroutineNode, 'subroutine', 'declaration');
 
         this.setNextToken();
-        this.parseSymbol('(');
+        this.parseSymbol(subroutineNode, '(');
 
         this.setNextToken();
-        this.parseParameterList();
-        this.parseSymbol(')');
+        this.parseParameterList(subroutineNode);
+        this.parseSymbol(subroutineNode, ')');
 
         this.setNextToken();
-        this.parseSubroutineBody();
+        this.parseSubroutineBody(subroutineNode);
 
-        this.addVariableData();
+        this.addVariableData(subroutineNode);
 
         this.decreaseIndent();
         this.writeXML('</subroutineDec>');
         this.subroutineVarTable.reset();
+
+        return subroutineNode;
     }
 
-    private parseParameterList(): void {
+    private parseParameterList(parent: Node): void {
         this.writeXML('<parameterList>');
         this.increaseIndent();
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
         while (!closingBracketsReached) {
-            this.parseParameter();
+            this.parseParameter(this.createDummyNode());
             this.setNextToken();
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
@@ -213,24 +262,29 @@ export class Parser {
 
         this.decreaseIndent();
         this.writeXML('</parameterList>');
+
+        // at the moment only empty param list gets implemented
+        parent.addChild({ type: 'parameterList' });
     }
 
-    private parseParameter(): void {
+    private parseParameter(parent: Node): void {
         this.parseType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.parseIdentifier('variable', 'usage', { type, kind: 'argument' });
+        this.parseIdentifier(parent, 'variable', 'usage', { type, kind: 'argument' });
     }
 
-    private parseSubroutineBody(): void {
+    private parseSubroutineBody(parent: Node): void {
         this.writeXML('<subroutineBody>');
         this.increaseIndent();
 
-        this.parseSymbol('{');
+        const bodyNode = parent.addChild({ type: 'subroutineBody' });
+
+        this.parseSymbol(bodyNode, '{');
         this.setNextToken();
         this.parseSubroutineVars();
-        this.parseStatements();
-        this.parseSymbol('}');
+        this.parseStatements(bodyNode);
+        this.parseSymbol(bodyNode, '}');
 
         this.decreaseIndent();
         this.writeXML('</subroutineBody>');
@@ -247,7 +301,7 @@ export class Parser {
         this.writeXML('<varDec>');
         this.increaseIndent();
 
-        this.parseKeyword('var');
+        this.parseKeyword(this.createDummyNode(), 'var');
         this.setNextToken();
         this.parseVarDec('local');
 
@@ -263,7 +317,7 @@ export class Parser {
         this.parseType();
         const type = this.token.value.toString();
         this.setNextToken();
-        this.parseIdentifier('variable', 'declaration', { type, kind });
+        this.parseIdentifier(this.createDummyNode(), 'variable', 'declaration', { type, kind });
 
         let semicolonReached: boolean = false;
         while (!semicolonReached) {
@@ -272,11 +326,11 @@ export class Parser {
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
                 this.writeXML();
                 this.setNextToken();
-                this.parseIdentifier('variable', 'declaration', { type, kind });
+                this.parseIdentifier(this.createDummyNode(), 'variable', 'declaration', { type, kind });
                 continue;
             }
 
-            this.parseSymbol(';');
+            this.parseSymbol(this.createDummyNode(), ';');
             semicolonReached = true;
         }
     }
@@ -285,9 +339,11 @@ export class Parser {
      * parses statements
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseStatements(): void {
+    private parseStatements(parent: Node): void {
         this.writeXML('<statements>');
         this.increaseIndent();
+
+        const statementsNode = parent.addChild({ type: 'statements' });
 
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === '}';
         while (!closingBracketsReached) {
@@ -302,10 +358,10 @@ export class Parser {
                     this.parseWhile();
                     break;
                 case 'do':
-                    this.parseDo();
+                    this.parseDo(statementsNode);
                     break;
                 case 'return':
-                    this.parseReturn();
+                    this.parseReturn(statementsNode);
                     break;
                 default:
                     closingBracketsReached = true;
@@ -324,27 +380,27 @@ export class Parser {
     private parseLet(): void {
         this.writeXML('<letStatement>');
         this.increaseIndent();
-        this.parseKeyword('let');
+        this.parseKeyword(this.createDummyNode(), 'let');
 
         this.setNextToken();
-        this.parseIdentifier('variable', 'definition');
+        this.parseIdentifier(this.createDummyNode(), 'variable', 'definition');
 
         this.setNextToken();
         if (this.token.value !== '=') {
-            this.parseSymbol('[');
+            this.parseSymbol(this.createDummyNode(), '[');
 
             this.setNextToken();
-            this.parseExpression();
-            this.parseSymbol(']');
+            this.parseExpression(this.createDummyNode());
+            this.parseSymbol(this.createDummyNode(), ']');
 
             this.setNextToken();
         }
 
-        this.parseSymbol('=');
+        this.parseSymbol(this.createDummyNode(), '=');
 
         this.setNextToken();
-        this.parseExpression();
-        this.parseSymbol(';');
+        this.parseExpression(this.createDummyNode());
+        this.parseSymbol(this.createDummyNode(), ';');
 
         this.decreaseIndent();
         this.writeXML('</letStatement>');
@@ -354,33 +410,33 @@ export class Parser {
         this.writeXML('<ifStatement>');
         this.increaseIndent();
 
-        this.parseKeyword('if');
+        this.parseKeyword(this.createDummyNode(), 'if');
 
         this.setNextToken();
-        this.parseSymbol('(');
+        this.parseSymbol(this.createDummyNode(), '(');
 
         this.setNextToken();
-        this.parseExpression();
-        this.parseSymbol(')');
+        this.parseExpression(this.createDummyNode());
+        this.parseSymbol(this.createDummyNode(), ')');
 
         this.setNextToken();
-        this.parseSymbol('{');
+        this.parseSymbol(this.createDummyNode(), '{');
 
         this.setNextToken();
-        this.parseStatements();
-        this.parseSymbol('}');
+        this.parseStatements(this.createDummyNode());
+        this.parseSymbol(this.createDummyNode(), '}');
 
         const tokenAhead: Token = this.tokenizer.lookAhead();
         if (tokenAhead?.value === 'else') {
             this.setNextToken();
-            this.parseKeyword('else');
+            this.parseKeyword(this.createDummyNode(), 'else');
 
             this.setNextToken();
-            this.parseSymbol('{');
+            this.parseSymbol(this.createDummyNode(), '{');
 
             this.setNextToken();
-            this.parseStatements();
-            this.parseSymbol('}');
+            this.parseStatements(this.createDummyNode());
+            this.parseSymbol(this.createDummyNode(), '}');
         }
 
         this.decreaseIndent();
@@ -391,54 +447,58 @@ export class Parser {
         this.writeXML('<whileStatement>');
         this.increaseIndent();
 
-        this.parseKeyword('while');
+        this.parseKeyword(this.createDummyNode(), 'while');
 
         this.setNextToken();
-        this.parseSymbol('(');
+        this.parseSymbol(this.createDummyNode(), '(');
 
         this.setNextToken();
-        this.parseExpression();
-        this.parseSymbol(')');
+        this.parseExpression(this.createDummyNode());
+        this.parseSymbol(this.createDummyNode(), ')');
 
         this.setNextToken();
-        this.parseSymbol('{');
+        this.parseSymbol(this.createDummyNode(), '{');
 
         this.setNextToken();
-        this.parseStatements();
-        this.parseSymbol('}');
+        this.parseStatements(this.createDummyNode());
+        this.parseSymbol(this.createDummyNode(), '}');
 
         this.decreaseIndent();
         this.writeXML('</whileStatement>');
     }
 
-    private parseDo(): void {
+    private parseDo(parent: Node): void {
         this.writeXML('<doStatement>');
         this.increaseIndent();
 
-        this.parseKeyword('do');
+        const doNode = parent.addChild({ type: 'doStatement' });
+
+        this.parseKeyword(doNode, 'do');
 
         this.setNextToken();
-        this.parseSubroutineCall();
+        this.parseSubroutineCall(doNode);
 
         this.setNextToken();
-        this.parseSymbol(';');
+        this.parseSymbol(doNode, ';');
 
         this.decreaseIndent();
         this.writeXML('</doStatement>');
     }
 
-    private parseReturn(): void {
+    private parseReturn(parent: Node): void {
         this.writeXML('<returnStatement>');
         this.increaseIndent();
 
-        this.parseKeyword('return');
+        const returnNode = parent.addChild({ type: 'returnStatement' });
+
+        this.parseKeyword(returnNode, 'return');
 
         this.setNextToken();
         if (this.token.value !== ';') {
-            this.parseExpression();
+            this.parseExpression(returnNode);
         }
 
-        this.parseSymbol(';');
+        this.parseSymbol(returnNode, ';');
 
         this.decreaseIndent();
         this.writeXML('</returnStatement>');
@@ -448,17 +508,20 @@ export class Parser {
      * parses expression
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseExpression(): void {
+    private parseExpression(parent: Node): void {
         this.writeXML('<expression>');
         this.increaseIndent();
 
-        this.parseTerm();
+        const expressionNode = parent.addChild({ type: 'expression' });
+
+        this.parseTerm(expressionNode);
 
         this.setNextToken();
         while (this.token.type === 'SYMBOL' && OPERATORS.includes(this.token.value as string)) {
             this.writeXML();
+            expressionNode.addChild({ type: 'symbol', value: this.token.value });
             this.setNextToken();
-            this.parseTerm();
+            this.parseTerm(expressionNode);
             this.setNextToken();
         }
 
@@ -466,38 +529,44 @@ export class Parser {
         this.writeXML('</expression>');
     }
 
-    private parseTerm(): void {
+    private parseTerm(parent: Node): void {
         this.writeXML('<term>');
         this.increaseIndent();
 
+        const termNode = parent.addChild({ type: 'term' });
+
         switch (this.token.type) {
             case 'INT_CONST':
-                this.parseInteger();
+                this.parseInteger(termNode);
                 break;
             case 'STRING_CONST':
-                this.writeXML();
+                this.parseString(termNode);
                 break;
             case 'KEYWORD':
-                this.parseOneOfKeywords(KEYWORD_CONSTANTS);
+                this.parseOneOfKeywords(termNode, KEYWORD_CONSTANTS);
                 break;
             case 'IDENTIFIER':
                 const tokenAhead: Token = this.tokenizer.lookAhead();
 
                 if (tokenAhead?.value === '[') {
                     this.writeXML();
+                    const arrayNode = this.parseIdentifier(termNode, 'variable', 'usage', {
+                        kind: 'local',
+                        type: 'array',
+                    });
 
                     this.setNextToken();
-                    this.parseSymbol('[');
+                    this.parseSymbol(arrayNode, '[');
 
                     this.setNextToken();
-                    this.parseExpression();
+                    this.parseExpression(arrayNode);
 
-                    this.parseSymbol(']');
+                    this.parseSymbol(arrayNode, ']');
                     break;
                 }
 
                 if (tokenAhead?.value === '(' || tokenAhead?.value === '.') {
-                    this.parseSubroutineCall();
+                    this.parseSubroutineCall(termNode);
                     break;
                 }
 
@@ -505,18 +574,18 @@ export class Parser {
                 break;
             case 'SYMBOL':
                 if (this.token.value === '(') {
-                    this.parseSymbol('(');
+                    this.parseSymbol(termNode, '(');
 
                     this.setNextToken();
-                    this.parseExpression();
+                    this.parseExpression(termNode);
 
-                    this.parseSymbol(')');
+                    this.parseSymbol(termNode, ')');
                     break;
                 }
 
-                this.parseOneOfSymbols(UNARY_OPERATORS);
+                this.parseOneOfSymbols(termNode, UNARY_OPERATORS);
                 this.setNextToken();
-                this.parseTerm();
+                this.parseTerm(termNode);
                 break;
         }
 
@@ -524,43 +593,45 @@ export class Parser {
         this.writeXML('</term>');
     }
 
-    private parseSubroutineCall(): void {
+    private parseSubroutineCall(parent: Node): void {
         const tokenAhead: Token = this.tokenizer.lookAhead();
         const category = tokenAhead.value === '(' ? 'subroutine' : 'class';
-        this.parseIdentifier(category, 'usage');
+        this.parseIdentifier(parent, category, 'usage');
 
         this.setNextToken();
-        this.parseOneOfSymbols(['(', '.']);
+        this.parseOneOfSymbols(parent, ['(', '.']);
 
         if (this.token.value === '(') {
             this.setNextToken();
-            this.parseExpressionList();
-            this.parseSymbol(')');
+            this.parseExpressionList(parent);
+            this.parseSymbol(parent, ')');
             return;
         }
 
         this.setNextToken();
-        this.parseIdentifier('subroutine', 'usage');
+        this.parseIdentifier(parent, 'subroutine', 'usage');
 
         this.setNextToken();
-        this.parseSymbol('(');
+        this.parseSymbol(parent, '(');
 
         this.setNextToken();
-        this.parseExpressionList();
-        this.parseSymbol(')');
+        this.parseExpressionList(parent);
+        this.parseSymbol(parent, ')');
     }
 
     /**
      * parses a list of comma separated expressions
      * (after execution the "setNextToken" method call is not needed)
      */
-    private parseExpressionList(): void {
+    private parseExpressionList(parent: Node): void {
         this.writeXML('<expressionList>');
         this.increaseIndent();
 
+        const listNode = parent.addChild({ type: 'expressionList' });
+
         let closingBracketsReached: boolean = this.token.type === 'SYMBOL' && this.token.value === ')';
         while (!closingBracketsReached) {
-            this.parseExpression();
+            this.parseExpression(listNode);
             closingBracketsReached = true; // by default expecting closing bracket (validated later in caller)
 
             if (this.token.type === 'SYMBOL' && this.token.value === ',') {
@@ -574,7 +645,7 @@ export class Parser {
         this.writeXML('</expressionList>');
     }
 
-    private addVariableData(): void {
+    private addVariableData(subroutineNode: Node): void {
         this.writeXML('<variableData>');
         this.increaseIndent();
 
@@ -583,5 +654,13 @@ export class Parser {
 
         this.decreaseIndent();
         this.writeXML('</variableData>');
+
+        subroutineNode.addChild({
+            type: 'variableData',
+            props: {
+                nArgs: this.subroutineVarTable.kindCount('argument'),
+                nVars: this.subroutineVarTable.kindCount('local'),
+            },
+        });
     }
 }
