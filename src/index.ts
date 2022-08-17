@@ -5,7 +5,7 @@ function compileFiles(files: File[], args: string[]) {
     const compiledFiles: File[] = [];
 
     for (const file of files) {
-        const { tokens, parseTree, vm } = Compiler.compile(file.data);
+        const { tokens, parseTreeXML, vm } = Compiler.compile(file.data);
 
         compiledFiles.push({
             name: file.name,
@@ -19,7 +19,7 @@ function compileFiles(files: File[], args: string[]) {
                 name: file.name,
                 extension: 'xml',
                 dir: file.dir,
-                data: parseTree,
+                data: parseTreeXML,
             });
         }
 

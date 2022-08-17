@@ -8,35 +8,35 @@ import { VariableKind, VariableTable } from './variable-table';
 
 export type ParserOutput = {
     tokens: string[];
-    parseTree: string[];
+    parseTree: Tree;
+    parseTreeXML: string[];
 };
 
 export class Parser {
     private readonly tokenizer: Tokenizer;
     private token: Token;
-    private output: ParserOutput = { tokens: [], parseTree: [] };
+    private parseTreeXML: string[] = [];
+    private parseTree: Tree;
     private classVarTable: VariableTable;
     private subroutineVarTable: VariableTable;
     private indent = 0;
-    private tree: Tree;
 
     constructor(input: string[]) {
         this.tokenizer = new Tokenizer(input);
         this.classVarTable = new VariableTable();
         this.subroutineVarTable = new VariableTable();
-        this.output.tokens = this.tokenizer.getTokens();
     }
 
     parseClass(): void {
         this.startParseTree();
 
         this.setNextToken();
-        this.parseIdentifier(this.tree.root, 'class', 'declaration');
+        this.parseIdentifier(this.parseTree.root, 'class', 'declaration');
 
         this.setNextToken();
-        this.parseSymbol(this.tree.root, '{');
+        this.parseSymbol(this.parseTree.root, '{');
 
-        let currentParent: Node = this.tree.root;
+        let currentParent: Node = this.parseTree.root;
         while (this.tokenizer.hasMoreTokens()) {
             this.setNextToken();
 
@@ -50,15 +50,14 @@ export class Parser {
                 continue;
             }
 
-            this.parseSymbol(this.tree.root, '}');
+            this.parseSymbol(this.parseTree.root, '}');
         }
 
         this.finishParseTree();
     }
 
     getOutput(): ParserOutput {
-        console.dir(this.tree.root, { depth: null });
-        return this.output;
+        return { tokens: this.tokenizer.getTokens(), parseTree: this.parseTree, parseTreeXML: this.parseTreeXML };
     }
 
     private createDummyNode(): Node {
@@ -85,7 +84,7 @@ export class Parser {
             out = out.padStart(out.length + this.indent * INDENT_SIZE);
         }
 
-        this.output.parseTree.push(out);
+        this.parseTreeXML.push(out);
     }
 
     private parseIdentifier(
@@ -142,7 +141,7 @@ export class Parser {
         this.increaseIndent();
         this.writeXML();
 
-        this.tree = new Tree({ type: 'keyword', value: 'class' });
+        this.parseTree = new Tree({ type: 'keyword', value: 'class' });
     }
 
     private finishParseTree(): void {

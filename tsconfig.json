@@ -4,7 +4,8 @@
         "lib": ["dom", "es6", "es7"],
         "target": "es6",
         "outDir": "build",
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "strictFunctionTypes": true
     },
     "include": ["src/**/*"]
 }
