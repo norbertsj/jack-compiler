@@ -10,6 +10,11 @@ export interface Variable extends VariableInput {
     index: number;
 }
 
+export type VariableData = {
+    nArgs: number;
+    nVars: number;
+};
+
 export class VariableTable {
     private variables: Variable[] = [];
 

@@ -1,10 +1,32 @@
 import { Hash } from './hash';
+import { IdentifierCategory, IdentifierContext } from './identifier';
+import { TokenType } from './token';
+
+export type NodeType =
+    | TokenType
+    | 'RETURN'
+    | 'RETURN_TYPE'
+    | 'SUBROUTINE_DEC'
+    | 'SUBROUTINE_BODY'
+    | 'SUBROUTINE_VAR_DEC'
+    | 'PARAM_LIST'
+    | 'CLASS_VAR_DEC'
+    | 'STATEMENTS'
+    | 'DO'
+    | 'LET'
+    | 'IF'
+    | 'ELSE'
+    | 'WHILE'
+    | 'EXPRESSION'
+    | 'EXPRESSION_LIST'
+    | 'TERM'
+    | 'VAR_DATA';
 
 export type NodeValue = {
-    type: string;
+    type: NodeType;
     value?: string | number;
-    category?: string;
-    context?: string;
+    category?: IdentifierCategory;
+    context?: IdentifierContext;
     props?: Record<string, unknown>;
 };
 
@@ -47,21 +69,3 @@ export class Tree {
         return null;
     }
 }
-
-// const tree = new Tree('subroutine');
-// tree.root.addChild('type');
-// tree.root.addChild('returnType');
-// tree.root.addChild('name');
-// const statements = tree.root.addChild('statements');
-// const subCall = statements.addChild('call Output.printString');
-// const expr = subCall.addChild('expression');
-// expr.addChild('1');
-// expr.addChild('+');
-// expr.addChild('3');
-
-// for (const output of tree.traverse(tree.root)) {
-//     console.log(output.key, output.value);
-// }
-
-// console.log('lets see if we can find expression node, key =', expr.key);
-// console.log(tree.findNode(expr.key));

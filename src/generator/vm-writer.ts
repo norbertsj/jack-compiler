@@ -40,4 +40,8 @@ export class VMWriter {
     writeReturn() {
         this.output.push('return');
     }
+
+    writeEmptyLine() {
+        this.output.push('');
+    }
 }

@@ -45,7 +45,7 @@ async function main(): Promise<void> {
 
         console.log('Compilation finished');
     } catch (e) {
-        console.log(`Error: ${e.message}`);
+        console.error(e.stack);
     }
 }
 

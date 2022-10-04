@@ -7,7 +7,7 @@
     "main": "index.js",
     "scripts": {
         "build": "tsc",
-        "test": "node build/index test/Seven --parse-tree --tokens"
+        "test": "node build/index test/ConvertToBin --parse-tree --tokens"
     },
     "dependencies": {
         "sha3": "^2.1.4"
