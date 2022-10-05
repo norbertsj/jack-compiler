@@ -1,9 +1,10 @@
-import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from './constants';
-import { Token } from './token';
+import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from '../constants';
+import { LexicalElement } from '../defines';
+import { Token } from '../types';
 
 export class Tokenizer {
     private readonly tokens: Token[];
-    private currentTokenIndex: number;
+    private currentTokenIndex = 0;
 
     constructor(input: string[]) {
         this.tokens = this.tokenize(this.removeComments(input));
@@ -74,30 +75,30 @@ export class Tokenizer {
     private generateToken(value: string): Token {
         const token: Token = {
             value,
-            type: 'IDENTIFIER',
+            type: LexicalElement.IDENTIFIER,
             xml: `<identifier>${value}</identifier>`,
         };
 
         if (KEYWORDS.includes(value)) {
-            token.type = 'KEYWORD';
+            token.type = LexicalElement.KEYWORD;
             token.xml = `<keyword>${value}</keyword>`;
         }
 
         if (SYMBOLS.includes(value)) {
-            token.type = 'SYMBOL';
+            token.type = LexicalElement.SYMBOL;
             token.xml = MARKUP_SYMBOLS_MAP.has(value)
                 ? `<symbol>${MARKUP_SYMBOLS_MAP.get(value)}</symbol>`
                 : `<symbol>${value}</symbol>`;
         }
 
         if (value.startsWith('"') && value.endsWith('"')) {
-            token.type = 'STRING_CONST';
+            token.type = LexicalElement.STRING;
             token.value = value.replace(/\"/g, '');
             token.xml = `<stringConstant>${value.replace(/\"/g, '')}</stringConstant>`;
         }
 
         if (!isNaN(parseInt(value, 10))) {
-            token.type = 'INT_CONST';
+            token.type = LexicalElement.INTEGER;
             token.value = parseInt(value, 10);
             token.xml = `<integerConstant>${value}</integerConstant>`;
         }

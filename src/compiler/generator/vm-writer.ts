@@ -1,3 +1,5 @@
+import { Command, MemorySegment } from '../defines';
+
 export class VMWriter {
     private output: string[] = [];
 
@@ -5,15 +7,15 @@ export class VMWriter {
         return this.output;
     }
 
-    writePush(segment: string, index: number) {
+    writePush(segment: MemorySegment, index: number) {
         this.output.push(`push ${segment} ${index}`);
     }
 
-    writePop(segment: string, index: number) {
+    writePop(segment: MemorySegment, index: number) {
         this.output.push(`pop ${segment} ${index}`);
     }
 
-    writeArithmetic(command: string) {
+    writeArithmetic(command: Command) {
         this.output.push(command);
     }
 

@@ -1,33 +1,37 @@
-import { Token } from './token';
-import { TYPES, INTEGER_MIN, INTEGER_MAX } from './constants';
+import { Token } from '../types';
+import { TYPES, INTEGER_MIN, INTEGER_MAX } from '../constants';
+import { LexicalElement } from '../defines';
 
 export class Validator {
     static validateIdentifier(token: Token): void {
-        if (token.type !== 'IDENTIFIER') {
+        if (token.type !== LexicalElement.IDENTIFIER) {
             Validator.throwError('Identifier', token);
         }
     }
 
     static validateKeyword(token: Token, keyword: string) {
-        if (token.type !== 'KEYWORD' || token.value !== keyword) {
+        if (token.type !== LexicalElement.KEYWORD || token.value !== keyword) {
             Validator.throwError(`Keyword "${keyword}"`, token);
         }
     }
 
     static validateKeywords(token: Token, keywords: string[]): void {
-        if (token.type !== 'KEYWORD' || !keywords.includes(token.value as string)) {
+        if (token.type !== LexicalElement.KEYWORD || !keywords.includes(token.value as string)) {
             Validator.throwError(`Keyword ${keywords.map((kw) => `"${kw}"`).join(', ')}`, token);
         }
     }
 
     static validateType(token: Token, additional?: string[]): void {
-        let types = [...TYPES];
+        let types: string[] = [...TYPES];
 
-        if (additional?.length > 0) {
+        if (additional && additional.length > 0) {
             types = [...types, ...additional];
         }
 
-        if ((token.type === 'KEYWORD' && types.includes(token.value as string)) || token.type === 'IDENTIFIER') {
+        if (
+            (token.type === LexicalElement.KEYWORD && types.includes(token.value as string)) ||
+            token.type === LexicalElement.IDENTIFIER
+        ) {
             return;
         }
 
@@ -39,13 +43,13 @@ export class Validator {
     }
 
     static validateSymbol(token: Token, symbol: string): void {
-        if (token.type !== 'SYMBOL' || token.value !== symbol) {
+        if (token.type !== LexicalElement.SYMBOL || token.value !== symbol) {
             Validator.throwError(`Symbol "${symbol}"`, token);
         }
     }
 
     static validateSymbols(token: Token, symbols: string[]): void {
-        if (token.type !== 'SYMBOL' || !symbols.includes(token.value as string)) {
+        if (token.type !== LexicalElement.SYMBOL || !symbols.includes(token.value as string)) {
             Validator.throwError(`Symbol ${symbols.map((s) => `"${s}"`).join(', ')}`, token);
         }
     }
@@ -53,7 +57,7 @@ export class Validator {
     static validateIntegerValue(token: Token): void {
         const intVal = parseInt(token.value as string, 10);
 
-        if (token.type !== 'INT_CONST' || isNaN(intVal) || intVal < INTEGER_MIN || intVal > INTEGER_MAX) {
+        if (token.type !== LexicalElement.INTEGER || isNaN(intVal) || intVal < INTEGER_MIN || intVal > INTEGER_MAX) {
             Validator.throwError(`Integer between ${INTEGER_MIN} and ${INTEGER_MAX}`, token);
         }
     }

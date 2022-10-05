@@ -1,4 +1,4 @@
-export type VariableKind = 'local' | 'argument' | 'field' | 'static';
+import { VariableKind } from '../defines';
 
 export interface VariableInput {
     name: string;
@@ -9,11 +9,6 @@ export interface VariableInput {
 export interface Variable extends VariableInput {
     index: number;
 }
-
-export type VariableData = {
-    nArgs: number;
-    nVars: number;
-};
 
 export class VariableTable {
     private variables: Variable[] = [];

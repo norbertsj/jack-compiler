@@ -1,25 +1,25 @@
-import { Tree, Node } from '../analyser/tree';
-import { VariableData } from '../analyser/variable-table';
 import { VMWriter } from './vm-writer';
-import { OPERATORS, UNARY_OPERATORS } from '../analyser/constants';
+import { OPERATORS, UNARY_OPERATORS } from '../constants';
+import { ParseTree, ParseTreeNode } from '../parse-tree';
+import { IdentifierCategory, IdentifierContext, LexicalElement, ParseTreeElement } from '../defines';
 
-type SubroutineData = {
+export type SubroutineData = {
     returnType: string;
-    locals: Node[];
-    args: Node[];
+    locals: ParseTreeNode[];
+    args: ParseTreeNode[];
+};
+
+export type ClassData = {
+    name: string;
+    vars: ParseTreeNode[];
+    whileLoops: number;
+    ifStatements: number;
 };
 
 const defaultSubroutineData: SubroutineData = {
     returnType: 'void',
     locals: [],
     args: [],
-};
-
-type ClassData = {
-    name: string;
-    vars: Node[];
-    whileLoops: number;
-    ifStatements: number;
 };
 
 function debug(data: any) {
@@ -31,14 +31,14 @@ export class CodeGenerator {
     private classData: ClassData;
     private subroutineData = defaultSubroutineData;
 
-    constructor(private readonly tree: Tree) {
+    constructor(private readonly tree: ParseTree) {
         this.vmWriter = new VMWriter();
         this.classData = { name: this.findClassName(), vars: [], whileLoops: 0, ifStatements: 0 };
     }
 
     generate() {
         for (const node of this.tree.root.children) {
-            if (node.value.type === 'SUBROUTINE_DEC') {
+            if (node.value.type === ParseTreeElement.SUBROUTINE_DEC) {
                 this.generateSubroutine(node);
                 continue;
             }
@@ -52,9 +52,9 @@ export class CodeGenerator {
     private findClassName(): string {
         const node = this.tree.root.children.find(
             (child) =>
-                child.value.type === 'IDENTIFIER' &&
-                child.value.category === 'class' &&
-                child.value.context === 'declaration'
+                child.value.type === LexicalElement.IDENTIFIER &&
+                child.value.category === IdentifierCategory.CLASS &&
+                child.value.context === IdentifierContext.USAGE
         );
 
         if (!node) {
@@ -64,7 +64,7 @@ export class CodeGenerator {
         return node.value.value as string;
     }
 
-    private generateSubroutine(subroutineNode: Node) {
+    private generateSubroutine(subroutineNode: ParseTreeNode) {
         this.setSubroutineData(subroutineNode);
 
         const subroutineName = this.findSubroutineName(subroutineNode);
@@ -78,35 +78,35 @@ export class CodeGenerator {
         this.vmWriter.writeEmptyLine();
     }
 
-    private generateSubroutineBody(subroutineBodyNode: Node) {
+    private generateSubroutineBody(subroutineBodyNode: ParseTreeNode) {
         for (const node of subroutineBodyNode.children) {
-            if (node.value.type === 'STATEMENTS') {
+            if (node.value.type === ParseTreeElement.STATEMENTS) {
                 this.generateStatements(node);
                 continue;
             }
 
-            if (node.value.type === 'SUBROUTINE_VAR_DEC') {
+            if (node.value.type === ParseTreeElement.SUBROUTINE_VAR_DEC) {
                 this.addSubroutineLocalVars(node);
                 continue;
             }
         }
     }
 
-    private addSubroutineLocalVars(varDecNode: Node) {
+    private addSubroutineLocalVars(varDecNode: ParseTreeNode) {
         const vars = varDecNode.children.filter((node) => node.value.type === 'IDENTIFIER');
         this.subroutineData.locals = [...this.subroutineData.locals, ...vars];
     }
 
-    private setSubroutineArgs(subroutineNode: Node) {
+    private setSubroutineArgs(subroutineNode: ParseTreeNode) {
         const paramNode = this.findSubroutineParams(subroutineNode);
         this.subroutineData.args = paramNode.children.filter((node) => node.value.type === 'IDENTIFIER');
     }
 
-    private setSubroutineReturnType(subroutineNode: Node) {
+    private setSubroutineReturnType(subroutineNode: ParseTreeNode) {
         this.subroutineData.returnType = this.findReturnType(subroutineNode);
     }
 
-    private setSubroutineData(subroutineNode: Node) {
+    private setSubroutineData(subroutineNode: ParseTreeNode) {
         this.setSubroutineReturnType(subroutineNode);
         this.setSubroutineArgs(subroutineNode);
     }
@@ -115,7 +115,7 @@ export class CodeGenerator {
         this.subroutineData = defaultSubroutineData;
     }
 
-    private findSubroutineLocalVar(name: string): Node | null {
+    private findSubroutineLocalVar(name: string): ParseTreeNode | null {
         const varNode = this.subroutineData.locals.find((node) => node.value.value === name);
         if (!varNode) {
             return null;
@@ -124,7 +124,7 @@ export class CodeGenerator {
         return varNode;
     }
 
-    private findSubroutineArgVar(name: string): Node | null {
+    private findSubroutineArgVar(name: string): ParseTreeNode | null {
         const varNode = this.subroutineData.args.find((node) => node.value.value === name);
         if (!varNode) {
             return null;
@@ -133,7 +133,7 @@ export class CodeGenerator {
         return varNode;
     }
 
-    private findClassVar(name: string): Node | null {
+    private findClassVar(name: string): ParseTreeNode | null {
         const varNode = this.classData.vars.find((node) => node.value.value === name);
         if (!varNode) {
             return null;
@@ -142,7 +142,7 @@ export class CodeGenerator {
         return varNode;
     }
 
-    private findVariable(name: string): Node | null {
+    private findVariable(name: string): ParseTreeNode | null {
         const subLocal = this.findSubroutineLocalVar(name);
         const subArg = this.findSubroutineArgVar(name);
         const classVar = this.findClassVar(name);
@@ -150,22 +150,22 @@ export class CodeGenerator {
         return subLocal || subArg || classVar || null;
     }
 
-    private generateStatements(statementsNode: Node) {
+    private generateStatements(statementsNode: ParseTreeNode) {
         for (const node of statementsNode.children) {
             switch (node.value.type) {
-                case 'DO':
+                case ParseTreeElement.DO:
                     this.generateDoStatement(node);
                     break;
-                case 'LET':
+                case ParseTreeElement.LET:
                     this.generateLetStatement(node);
                     break;
-                case 'IF':
+                case ParseTreeElement.IF:
                     this.generateIfStatement(node);
                     break;
-                case 'WHILE':
+                case ParseTreeElement.WHILE:
                     this.generateWhileStatement(node);
                     break;
-                case 'RETURN':
+                case ParseTreeElement.RETURN:
                     this.generateReturnStatement(node);
                     break;
                 default:
@@ -174,7 +174,7 @@ export class CodeGenerator {
         }
     }
 
-    private generateLetStatement(statementNode: Node) {
+    private generateLetStatement(statementNode: ParseTreeNode) {
         // todo: deal with arrays (will need different solution)
         const varNode = statementNode.children.find(
             (node) =>
@@ -184,13 +184,15 @@ export class CodeGenerator {
         );
         const varDecNode = this.findVariable(varNode.value.value as string);
 
-        const expressionNode = statementNode.children.find((node) => node.value.type === 'EXPRESSION');
+        const expressionNode = statementNode.children.find((node) => node.value.type === ParseTreeElement.EXPRESSION);
         this.generateExpression(expressionNode);
         this.vmWriter.writePop(varDecNode.value.props.kind as string, varDecNode.value.props.varTableIndex as number);
     }
 
-    private generateIfStatement(statementNode: Node) {
-        const conditionExpression = statementNode.children.find((child) => child.value.type === 'EXPRESSION');
+    private generateIfStatement(statementNode: ParseTreeNode) {
+        const conditionExpression = statementNode.children.find(
+            (child) => child.value.type === ParseTreeElement.EXPRESSION
+        );
         const endLabel = `IF.${this.classData.ifStatements}.END`;
         const elseLabel = `IF.${this.classData.ifStatements}.ELSE`;
         this.classData.ifStatements++;
@@ -198,10 +200,10 @@ export class CodeGenerator {
         this.generateExpression(conditionExpression);
         this.vmWriter.writeArithmetic('not');
 
-        const elseNode = statementNode.children.find((child) => child.value.type === 'ELSE');
+        const elseNode = statementNode.children.find((child) => child.value.type === ParseTreeElement.ELSE);
         this.vmWriter.writeIf(elseNode ? elseLabel : endLabel);
 
-        const statements = statementNode.children.find((child) => child.value.type === 'STATEMENTS');
+        const statements = statementNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
         this.generateStatements(statements);
 
         if (elseNode) {
@@ -215,13 +217,15 @@ export class CodeGenerator {
         this.vmWriter.writeLabel(endLabel);
     }
 
-    private generateElse(elseNode: Node) {
-        const statements = elseNode.children.find((child) => child.value.type === 'STATEMENTS');
+    private generateElse(elseNode: ParseTreeNode) {
+        const statements = elseNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
         this.generateStatements(statements);
     }
 
-    private generateWhileStatement(statementNode: Node) {
-        const conditionExpression = statementNode.children.find((child) => child.value.type === 'EXPRESSION'); // todo: look only between symbols ()
+    private generateWhileStatement(statementNode: ParseTreeNode) {
+        const conditionExpression = statementNode.children.find(
+            (child) => child.value.type === ParseTreeElement.EXPRESSION
+        ); // todo: look only between symbols ()
         const conditionLabel = `WHILE.${this.classData.whileLoops}.CONDITION`;
         const endLabel = `WHILE.${this.classData.whileLoops}.END`;
         this.classData.whileLoops++;
@@ -231,14 +235,14 @@ export class CodeGenerator {
         this.vmWriter.writeArithmetic('not');
         this.vmWriter.writeIf(endLabel);
 
-        const statementsNode = statementNode.children.find((child) => child.value.type === 'STATEMENTS');
+        const statementsNode = statementNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
         this.generateStatements(statementsNode);
 
         this.vmWriter.writeGoto(conditionLabel);
         this.vmWriter.writeLabel(endLabel);
     }
 
-    private generateDoStatement(statementNode: Node) {
+    private generateDoStatement(statementNode: ParseTreeNode) {
         let name = '';
         let nArgs = 0;
 
@@ -258,14 +262,14 @@ export class CodeGenerator {
         this.vmWriter.writeCall(name, nArgs);
     }
 
-    private generateExpressionList(listNode: Node) {
+    private generateExpressionList(listNode: ParseTreeNode) {
         for (const node of listNode.children) {
             this.generateExpression(node);
         }
     }
 
-    private generateExpression(expressionNode: Node) {
-        const ops: Node[] = [];
+    private generateExpression(expressionNode: ParseTreeNode) {
+        const ops: ParseTreeNode[] = [];
         for (const node of expressionNode.children) {
             if (node.value.type === 'TERM') {
                 this.generateTerm(node);
@@ -283,7 +287,7 @@ export class CodeGenerator {
         }
     }
 
-    private generateTerm(termNode: Node) {
+    private generateTerm(termNode: ParseTreeNode) {
         if (termNode.children.length === 1) {
             const child = termNode.children[0];
 
@@ -314,7 +318,7 @@ export class CodeGenerator {
         }
 
         if (this.isExpressionTerm(termNode)) {
-            const expressionNode = termNode.children.find((node) => node.value.type === 'EXPRESSION');
+            const expressionNode = termNode.children.find((node) => node.value.type === ParseTreeElement.EXPRESSION);
             this.generateExpression(expressionNode);
             return;
         }
@@ -329,7 +333,7 @@ export class CodeGenerator {
         this.generateDoStatement(termNode);
     }
 
-    private generateOp(opNode: Node, isUnary: boolean = false) {
+    private generateOp(opNode: ParseTreeNode, isUnary: boolean = false) {
         if (opNode.value.value === '+') {
             this.vmWriter.writeArithmetic('add');
         }
@@ -376,18 +380,18 @@ export class CodeGenerator {
         }
     }
 
-    private generateReturnStatement(statementNode: Node) {
+    private generateReturnStatement(statementNode: ParseTreeNode) {
         if (this.subroutineData.returnType === 'void') {
             this.vmWriter.writePush('constant', 0);
         } else {
-            const expression = statementNode.children.find((child) => child.value.type === 'EXPRESSION');
+            const expression = statementNode.children.find((child) => child.value.type === ParseTreeElement.EXPRESSION);
             this.generateExpression(expression);
         }
 
         this.vmWriter.writeReturn();
     }
 
-    private findSubroutineParams(subroutineNode: Node): Node {
+    private findSubroutineParams(subroutineNode: ParseTreeNode): ParseTreeNode {
         const node = subroutineNode.children.find((child) => child.value.type === 'PARAM_LIST');
 
         if (!node) {
@@ -397,7 +401,7 @@ export class CodeGenerator {
         return node;
     }
 
-    private findSubroutineBody(subroutineNode: Node): Node {
+    private findSubroutineBody(subroutineNode: ParseTreeNode): ParseTreeNode {
         const node = subroutineNode.children.find((child) => child.value.type === 'SUBROUTINE_BODY');
 
         if (!node) {
@@ -407,7 +411,7 @@ export class CodeGenerator {
         return node;
     }
 
-    private findSubroutineName(subroutineNode: Node): string {
+    private findSubroutineName(subroutineNode: ParseTreeNode): string {
         const node = subroutineNode.children.find(
             (child) =>
                 child.value.type === 'IDENTIFIER' &&
@@ -422,7 +426,7 @@ export class CodeGenerator {
         return node.value.value as string;
     }
 
-    private findVariableData(subroutineName: string, subroutineNode: Node): VariableData {
+    private findVariableData(subroutineName: string, subroutineNode: ParseTreeNode): VariableData {
         const node = subroutineNode.children.find((child) => child.value.type === 'VAR_DATA');
 
         if (!node) {
@@ -432,7 +436,7 @@ export class CodeGenerator {
         return node.value.props as VariableData;
     }
 
-    private findReturnType(subroutineNode: Node): string {
+    private findReturnType(subroutineNode: ParseTreeNode): string {
         const node = subroutineNode.children.find((child) => child.value.type === 'RETURN_TYPE');
 
         if (!node) {
@@ -442,10 +446,10 @@ export class CodeGenerator {
         return node.value.value as string;
     }
 
-    // todo: add generic child finders like child.value.type === 'EXPRESSION' and so on
+    // todo: add generic child finders like child.value.type === ParseTreeElement.EXPRESSION and so on
 
     //#region term
-    private isUnaryOp(termNode: Node): boolean {
+    private isUnaryOp(termNode: ParseTreeNode): boolean {
         if (termNode.children.length === 2) {
             const first = termNode.children[0];
             const second = termNode.children[1];
@@ -459,7 +463,7 @@ export class CodeGenerator {
         return false;
     }
 
-    private isExpressionTerm(termNode: Node): boolean {
+    private isExpressionTerm(termNode: ParseTreeNode): boolean {
         if (termNode.children.length === 3) {
             const first = termNode.children[0];
             const second = termNode.children[1];
@@ -468,7 +472,7 @@ export class CodeGenerator {
             return (
                 first.value.type === 'SYMBOL' &&
                 first.value.value === '(' &&
-                second.value.type === 'EXPRESSION' &&
+                second.value.type === ParseTreeElement.EXPRESSION &&
                 third.value.type === 'SYMBOL' &&
                 third.value.value === ')'
             );
