@@ -87,11 +87,11 @@ export class Parser {
         this.writeXML('</class>');
     }
 
-    private increaseIndent() {
+    private increaseIndent(): void {
         this.indent++;
     }
 
-    private decreaseIndent() {
+    private decreaseIndent(): void {
         this.indent--;
     }
 
@@ -164,7 +164,7 @@ export class Parser {
         return parent.addChild(nodeValue);
     }
 
-    private parseKeyword(parent: ParseTreeNode, value: string) {
+    private parseKeyword(parent: ParseTreeNode, value: string): void {
         Validator.validateKeyword(this.token, value);
         this.writeXML();
         parent.addChild({ type: LexicalElement.KEYWORD, value });

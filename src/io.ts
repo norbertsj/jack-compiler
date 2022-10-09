@@ -4,7 +4,7 @@ import { createInterface } from 'readline';
 
 export type File = {
     name: string;
-    extension: string;
+    extension: string | null;
     dir: string;
     data: string[];
 };
@@ -48,7 +48,7 @@ export class IO {
         }
 
         if (IO.isNonEmptyDirectory(pathInfo)) {
-            let files: File[] = [];
+            const files: File[] = [];
             const fileNames = readdirSync(pathInfo.input).filter((f) => f.includes('.jack'));
             for (const fileName of fileNames) {
                 files.push({

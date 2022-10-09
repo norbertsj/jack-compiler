@@ -7,43 +7,43 @@ export class VMWriter {
         return this.output;
     }
 
-    writePush(segment: MemorySegment, index: number) {
+    writePush(segment: MemorySegment, index: number): void {
         this.output.push(`push ${segment} ${index}`);
     }
 
-    writePop(segment: MemorySegment, index: number) {
+    writePop(segment: MemorySegment, index: number): void {
         this.output.push(`pop ${segment} ${index}`);
     }
 
-    writeArithmetic(command: Command) {
+    writeArithmetic(command: Command): void {
         this.output.push(command);
     }
 
-    writeLabel(label: string) {
+    writeLabel(label: string): void {
         this.output.push(`label ${label}`);
     }
 
-    writeGoto(label: string) {
+    writeGoto(label: string): void {
         this.output.push(`goto ${label}`);
     }
 
-    writeIf(label: string) {
+    writeIf(label: string): void {
         this.output.push(`if-goto ${label}`);
     }
 
-    writeCall(name: string, nArgs: number) {
+    writeCall(name: string, nArgs: number): void {
         this.output.push(`call ${name} ${nArgs}`);
     }
 
-    writeFunction(name: string, nLocals: number) {
+    writeFunction(name: string, nLocals: number): void {
         this.output.push(`function ${name} ${nLocals}`);
     }
 
-    writeReturn() {
+    writeReturn(): void {
         this.output.push('return');
     }
 
-    writeEmptyLine() {
+    writeEmptyLine(): void {
         this.output.push('');
     }
 }

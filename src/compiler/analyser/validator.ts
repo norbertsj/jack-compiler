@@ -9,7 +9,7 @@ export class Validator {
         }
     }
 
-    static validateKeyword(token: Token, keyword: string) {
+    static validateKeyword(token: Token, keyword: string): void {
         if (token.type !== LexicalElement.KEYWORD || token.value !== keyword) {
             Validator.throwError(`Keyword "${keyword}"`, token);
         }

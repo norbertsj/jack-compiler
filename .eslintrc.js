@@ -15,5 +15,6 @@ module.exports = {
     rules: {
         '@typescript-eslint/restrict-template-expressions': 'off',
         'no-useless-escape': 'off',
+        '@typescript-eslint/explicit-function-return-type': 'error',
     },
 };

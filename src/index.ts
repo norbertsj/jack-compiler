@@ -48,4 +48,4 @@ class Main {
 }
 
 const program = new Main();
-program.main().catch((e) => console.error(e.stack));
+program.main().catch((e: Error) => console.error(e.stack));

@@ -1,7 +1,17 @@
 import { VMWriter } from './vm-writer';
 import { OPERATORS, UNARY_OPERATORS } from '../constants';
 import { ParseTree, ParseTreeNode } from '../parse-tree';
-import { IdentifierCategory, IdentifierContext, LexicalElement, ParseTreeElement } from '../defines';
+import {
+    Command,
+    IdentifierCategory,
+    IdentifierContext,
+    JackKeyword,
+    JackSymbol,
+    LexicalElement,
+    MemorySegment,
+    ParseTreeElement,
+} from '../defines';
+import { VariableData } from '../types';
 
 export type SubroutineData = {
     returnType: string;
@@ -22,7 +32,7 @@ const defaultSubroutineData: SubroutineData = {
     args: [],
 };
 
-function debug(data: any) {
+function debug(data: any): void {
     console.dir(data, { depth: null });
 }
 
@@ -36,7 +46,7 @@ export class CodeGenerator {
         this.classData = { name: this.findClassName(), vars: [], whileLoops: 0, ifStatements: 0 };
     }
 
-    generate() {
+    generate(): void {
         for (const node of this.tree.root.children) {
             if (node.value.type === ParseTreeElement.SUBROUTINE_DEC) {
                 this.generateSubroutine(node);
@@ -64,7 +74,7 @@ export class CodeGenerator {
         return node.value.value as string;
     }
 
-    private generateSubroutine(subroutineNode: ParseTreeNode) {
+    private generateSubroutine(subroutineNode: ParseTreeNode): void {
         this.setSubroutineData(subroutineNode);
 
         const subroutineName = this.findSubroutineName(subroutineNode);
@@ -78,7 +88,7 @@ export class CodeGenerator {
         this.vmWriter.writeEmptyLine();
     }
 
-    private generateSubroutineBody(subroutineBodyNode: ParseTreeNode) {
+    private generateSubroutineBody(subroutineBodyNode: ParseTreeNode): void {
         for (const node of subroutineBodyNode.children) {
             if (node.value.type === ParseTreeElement.STATEMENTS) {
                 this.generateStatements(node);
@@ -92,26 +102,26 @@ export class CodeGenerator {
         }
     }
 
-    private addSubroutineLocalVars(varDecNode: ParseTreeNode) {
-        const vars = varDecNode.children.filter((node) => node.value.type === 'IDENTIFIER');
+    private addSubroutineLocalVars(varDecNode: ParseTreeNode): void {
+        const vars = varDecNode.children.filter((node) => node.value.type === LexicalElement.IDENTIFIER);
         this.subroutineData.locals = [...this.subroutineData.locals, ...vars];
     }
 
-    private setSubroutineArgs(subroutineNode: ParseTreeNode) {
+    private setSubroutineArgs(subroutineNode: ParseTreeNode): void {
         const paramNode = this.findSubroutineParams(subroutineNode);
-        this.subroutineData.args = paramNode.children.filter((node) => node.value.type === 'IDENTIFIER');
+        this.subroutineData.args = paramNode.children.filter((node) => node.value.type === LexicalElement.IDENTIFIER);
     }
 
-    private setSubroutineReturnType(subroutineNode: ParseTreeNode) {
+    private setSubroutineReturnType(subroutineNode: ParseTreeNode): void {
         this.subroutineData.returnType = this.findReturnType(subroutineNode);
     }
 
-    private setSubroutineData(subroutineNode: ParseTreeNode) {
+    private setSubroutineData(subroutineNode: ParseTreeNode): void {
         this.setSubroutineReturnType(subroutineNode);
         this.setSubroutineArgs(subroutineNode);
     }
 
-    private clearSubroutineData() {
+    private clearSubroutineData(): void {
         this.subroutineData = defaultSubroutineData;
     }
 
@@ -150,7 +160,7 @@ export class CodeGenerator {
         return subLocal || subArg || classVar || null;
     }
 
-    private generateStatements(statementsNode: ParseTreeNode) {
+    private generateStatements(statementsNode: ParseTreeNode): void {
         for (const node of statementsNode.children) {
             switch (node.value.type) {
                 case ParseTreeElement.DO:
@@ -174,22 +184,25 @@ export class CodeGenerator {
         }
     }
 
-    private generateLetStatement(statementNode: ParseTreeNode) {
+    private generateLetStatement(statementNode: ParseTreeNode): void {
         // todo: deal with arrays (will need different solution)
         const varNode = statementNode.children.find(
             (node) =>
-                node.value.type === 'IDENTIFIER' &&
-                node.value.category === 'variable' &&
-                node.value.context === 'definition'
+                node.value.type === LexicalElement.IDENTIFIER &&
+                node.value.category === IdentifierCategory.VARIABLE &&
+                node.value.context === IdentifierContext.USAGE
         );
-        const varDecNode = this.findVariable(varNode.value.value as string);
 
+        const varDecNode = this.findVariable(<string>varNode!.value.value);
         const expressionNode = statementNode.children.find((node) => node.value.type === ParseTreeElement.EXPRESSION);
-        this.generateExpression(expressionNode);
-        this.vmWriter.writePop(varDecNode.value.props.kind as string, varDecNode.value.props.varTableIndex as number);
+        this.generateExpression(expressionNode!);
+        this.vmWriter.writePop(
+            <MemorySegment>varDecNode!.value.props!.kind,
+            <number>varDecNode!.value.props!.varTableIndex
+        );
     }
 
-    private generateIfStatement(statementNode: ParseTreeNode) {
+    private generateIfStatement(statementNode: ParseTreeNode): void {
         const conditionExpression = statementNode.children.find(
             (child) => child.value.type === ParseTreeElement.EXPRESSION
         );
@@ -197,14 +210,14 @@ export class CodeGenerator {
         const elseLabel = `IF.${this.classData.ifStatements}.ELSE`;
         this.classData.ifStatements++;
 
-        this.generateExpression(conditionExpression);
-        this.vmWriter.writeArithmetic('not');
+        this.generateExpression(conditionExpression!);
+        this.vmWriter.writeArithmetic(Command.NOT);
 
         const elseNode = statementNode.children.find((child) => child.value.type === ParseTreeElement.ELSE);
         this.vmWriter.writeIf(elseNode ? elseLabel : endLabel);
 
         const statements = statementNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
-        this.generateStatements(statements);
+        this.generateStatements(statements!);
 
         if (elseNode) {
             // if we have `else` block then we need this `goto` for if block itself (to avoid exec of `else` block)
@@ -217,12 +230,12 @@ export class CodeGenerator {
         this.vmWriter.writeLabel(endLabel);
     }
 
-    private generateElse(elseNode: ParseTreeNode) {
+    private generateElse(elseNode: ParseTreeNode): void {
         const statements = elseNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
-        this.generateStatements(statements);
+        this.generateStatements(statements!);
     }
 
-    private generateWhileStatement(statementNode: ParseTreeNode) {
+    private generateWhileStatement(statementNode: ParseTreeNode): void {
         const conditionExpression = statementNode.children.find(
             (child) => child.value.type === ParseTreeElement.EXPRESSION
         ); // todo: look only between symbols ()
@@ -231,28 +244,31 @@ export class CodeGenerator {
         this.classData.whileLoops++;
 
         this.vmWriter.writeLabel(conditionLabel);
-        this.generateExpression(conditionExpression);
-        this.vmWriter.writeArithmetic('not');
+        this.generateExpression(conditionExpression!);
+        this.vmWriter.writeArithmetic(Command.NOT);
         this.vmWriter.writeIf(endLabel);
 
         const statementsNode = statementNode.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
-        this.generateStatements(statementsNode);
+        this.generateStatements(statementsNode!);
 
         this.vmWriter.writeGoto(conditionLabel);
         this.vmWriter.writeLabel(endLabel);
     }
 
-    private generateDoStatement(statementNode: ParseTreeNode) {
+    private generateDoStatement(statementNode: ParseTreeNode): void {
         let name = '';
         let nArgs = 0;
 
         for (const node of statementNode.children) {
-            if (node.value.type === 'IDENTIFIER' || (node.value.type === 'SYMBOL' && node.value.value === '.')) {
+            if (
+                node.value.type === LexicalElement.IDENTIFIER ||
+                (node.value.type === LexicalElement.SYMBOL && node.value.value === JackSymbol.DOT)
+            ) {
                 name += node.value.value;
                 continue;
             }
 
-            if (node.value.type === 'EXPRESSION_LIST') {
+            if (node.value.type === ParseTreeElement.EXPRESSION_LIST) {
                 this.generateExpressionList(node);
                 nArgs += node.children.length;
                 continue;
@@ -262,21 +278,21 @@ export class CodeGenerator {
         this.vmWriter.writeCall(name, nArgs);
     }
 
-    private generateExpressionList(listNode: ParseTreeNode) {
+    private generateExpressionList(listNode: ParseTreeNode): void {
         for (const node of listNode.children) {
             this.generateExpression(node);
         }
     }
 
-    private generateExpression(expressionNode: ParseTreeNode) {
+    private generateExpression(expressionNode: ParseTreeNode): void {
         const ops: ParseTreeNode[] = [];
         for (const node of expressionNode.children) {
-            if (node.value.type === 'TERM') {
+            if (node.value.type === ParseTreeElement.TERM) {
                 this.generateTerm(node);
                 continue;
             }
 
-            if (node.value.type === 'SYMBOL' && OPERATORS.includes(node.value.value as string)) {
+            if (node.value.type === LexicalElement.SYMBOL && OPERATORS.includes(<JackSymbol>node.value.value)) {
                 ops.push(node);
                 continue;
             }
@@ -287,39 +303,45 @@ export class CodeGenerator {
         }
     }
 
-    private generateTerm(termNode: ParseTreeNode) {
+    private generateTerm(termNode: ParseTreeNode): void {
         if (termNode.children.length === 1) {
             const child = termNode.children[0];
 
-            if (child.value.type === 'KEYWORD' && child.value.value === 'true') {
-                this.vmWriter.writePush('constant', 1);
-                this.vmWriter.writeArithmetic('neg');
-                return;
-            }
-
-            if (child.value.type === 'KEYWORD' && (child.value.value === 'false' || child.value.value === 'null')) {
-                this.vmWriter.writePush('constant', 0);
-                return;
-            }
-
-            if (child.value.type === 'INT_CONST') {
-                this.vmWriter.writePush('constant', child.value.value as number);
+            if (child.value.type === LexicalElement.KEYWORD && child.value.value === JackKeyword.TRUE) {
+                this.vmWriter.writePush(MemorySegment.CONSTANT, 1);
+                this.vmWriter.writeArithmetic(Command.NEG);
                 return;
             }
 
             if (
-                child.value.type === 'IDENTIFIER' &&
-                child.value.category === 'variable' &&
-                child.value.context === 'usage'
+                child.value.type === LexicalElement.KEYWORD &&
+                (child.value.value === JackKeyword.FALSE || child.value.value === JackKeyword.NULL)
             ) {
-                this.vmWriter.writePush(child.value.props.kind as string, child.value.props.varTableIndex as number);
+                this.vmWriter.writePush(MemorySegment.CONSTANT, 0);
+                return;
+            }
+
+            if (child.value.type === LexicalElement.INTEGER) {
+                this.vmWriter.writePush(MemorySegment.CONSTANT, <number>child.value.value);
+                return;
+            }
+
+            if (
+                child.value.type === LexicalElement.IDENTIFIER &&
+                child.value.category === IdentifierCategory.VARIABLE &&
+                child.value.context === IdentifierContext.USAGE
+            ) {
+                this.vmWriter.writePush(
+                    <MemorySegment>child.value.props!.kind,
+                    <number>child.value.props!.varTableIndex
+                );
                 return;
             }
         }
 
         if (this.isExpressionTerm(termNode)) {
             const expressionNode = termNode.children.find((node) => node.value.type === ParseTreeElement.EXPRESSION);
-            this.generateExpression(expressionNode);
+            this.generateExpression(expressionNode!);
             return;
         }
 
@@ -333,66 +355,66 @@ export class CodeGenerator {
         this.generateDoStatement(termNode);
     }
 
-    private generateOp(opNode: ParseTreeNode, isUnary: boolean = false) {
-        if (opNode.value.value === '+') {
-            this.vmWriter.writeArithmetic('add');
+    private generateOp(opNode: ParseTreeNode, isUnary = false): void {
+        if (opNode.value.value === JackSymbol.PLUS) {
+            this.vmWriter.writeArithmetic(Command.ADD);
         }
 
-        if (opNode.value.value === '-') {
+        if (opNode.value.value === JackSymbol.MINUS) {
             if (isUnary) {
-                this.vmWriter.writeArithmetic('neg');
+                this.vmWriter.writeArithmetic(Command.NEG);
                 return;
             }
 
-            this.vmWriter.writeArithmetic('sub');
+            this.vmWriter.writeArithmetic(Command.SUB);
         }
 
-        if (opNode.value.value === '*') {
+        if (opNode.value.value === JackSymbol.MULTIPLY) {
             this.vmWriter.writeCall('Math.multiply', 2);
         }
 
-        if (opNode.value.value === '/') {
+        if (opNode.value.value === JackSymbol.DIVIDE) {
             this.vmWriter.writeCall('Math.divide', 2);
         }
 
-        if (opNode.value.value === '&') {
-            this.vmWriter.writeArithmetic('and');
+        if (opNode.value.value === JackSymbol.AND) {
+            this.vmWriter.writeArithmetic(Command.AND);
         }
 
-        if (opNode.value.value === '|') {
-            this.vmWriter.writeArithmetic('or');
+        if (opNode.value.value === JackSymbol.OR) {
+            this.vmWriter.writeArithmetic(Command.OR);
         }
 
-        if (opNode.value.value === '<') {
-            this.vmWriter.writeArithmetic('lt');
+        if (opNode.value.value === JackSymbol.LT) {
+            this.vmWriter.writeArithmetic(Command.LT);
         }
 
-        if (opNode.value.value === '>') {
-            this.vmWriter.writeArithmetic('gt');
+        if (opNode.value.value === JackSymbol.GT) {
+            this.vmWriter.writeArithmetic(Command.GT);
         }
 
-        if (opNode.value.value === '=') {
-            this.vmWriter.writeArithmetic('eq');
+        if (opNode.value.value === JackSymbol.EQ) {
+            this.vmWriter.writeArithmetic(Command.EQ);
         }
 
-        if (opNode.value.value === '~') {
-            this.vmWriter.writeArithmetic('not');
+        if (opNode.value.value === JackSymbol.NOT) {
+            this.vmWriter.writeArithmetic(Command.NOT);
         }
     }
 
-    private generateReturnStatement(statementNode: ParseTreeNode) {
-        if (this.subroutineData.returnType === 'void') {
-            this.vmWriter.writePush('constant', 0);
+    private generateReturnStatement(statementNode: ParseTreeNode): void {
+        if (this.subroutineData.returnType === JackKeyword.VOID) {
+            this.vmWriter.writePush(MemorySegment.CONSTANT, 0);
         } else {
             const expression = statementNode.children.find((child) => child.value.type === ParseTreeElement.EXPRESSION);
-            this.generateExpression(expression);
+            this.generateExpression(expression!);
         }
 
         this.vmWriter.writeReturn();
     }
 
     private findSubroutineParams(subroutineNode: ParseTreeNode): ParseTreeNode {
-        const node = subroutineNode.children.find((child) => child.value.type === 'PARAM_LIST');
+        const node = subroutineNode.children.find((child) => child.value.type === ParseTreeElement.PARAM_LIST);
 
         if (!node) {
             throw new Error('Could not find subroutine params');
@@ -402,7 +424,7 @@ export class CodeGenerator {
     }
 
     private findSubroutineBody(subroutineNode: ParseTreeNode): ParseTreeNode {
-        const node = subroutineNode.children.find((child) => child.value.type === 'SUBROUTINE_BODY');
+        const node = subroutineNode.children.find((child) => child.value.type === ParseTreeElement.SUBROUTINE_BODY);
 
         if (!node) {
             throw new Error('Could not find subroutine body');
@@ -414,9 +436,9 @@ export class CodeGenerator {
     private findSubroutineName(subroutineNode: ParseTreeNode): string {
         const node = subroutineNode.children.find(
             (child) =>
-                child.value.type === 'IDENTIFIER' &&
-                child.value.category === 'subroutine' &&
-                child.value.context === 'declaration'
+                child.value.type === LexicalElement.IDENTIFIER &&
+                child.value.category === IdentifierCategory.SUBROUTINE &&
+                child.value.context === IdentifierContext.DECLARATION
         );
 
         if (!node) {
@@ -427,17 +449,17 @@ export class CodeGenerator {
     }
 
     private findVariableData(subroutineName: string, subroutineNode: ParseTreeNode): VariableData {
-        const node = subroutineNode.children.find((child) => child.value.type === 'VAR_DATA');
+        const node = subroutineNode.children.find((child) => child.value.type === ParseTreeElement.VAR_DATA);
 
         if (!node) {
             throw new Error(`Could not find variable data for subroutine: ${subroutineName}`);
         }
 
-        return node.value.props as VariableData;
+        return <VariableData>node.value.props;
     }
 
     private findReturnType(subroutineNode: ParseTreeNode): string {
-        const node = subroutineNode.children.find((child) => child.value.type === 'RETURN_TYPE');
+        const node = subroutineNode.children.find((child) => child.value.type === ParseTreeElement.RETURN_TYPE);
 
         if (!node) {
             throw new Error('Could not find subroutine return type');
@@ -454,9 +476,9 @@ export class CodeGenerator {
             const first = termNode.children[0];
             const second = termNode.children[1];
             return (
-                first.value.type === 'SYMBOL' &&
+                first.value.type === LexicalElement.SYMBOL &&
                 UNARY_OPERATORS.includes(first.value.value as string) &&
-                second.value.type === 'TERM'
+                second.value.type === ParseTreeElement.TERM
             );
         }
 
@@ -470,11 +492,11 @@ export class CodeGenerator {
             const third = termNode.children[2];
 
             return (
-                first.value.type === 'SYMBOL' &&
-                first.value.value === '(' &&
+                first.value.type === LexicalElement.SYMBOL &&
+                first.value.value === JackSymbol.BRACKET_OPEN &&
                 second.value.type === ParseTreeElement.EXPRESSION &&
-                third.value.type === 'SYMBOL' &&
-                third.value.value === ')'
+                third.value.type === LexicalElement.SYMBOL &&
+                third.value.value === JackSymbol.BRACKET_CLOSE
             );
         }
 
