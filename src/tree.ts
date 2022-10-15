@@ -4,7 +4,7 @@ export class TreeNode<V> {
     key: string;
     children: TreeNode<V>[] = [];
 
-    constructor(public value: V, public parent: string) {
+    constructor(public value: V, public parent: string | null) {
         this.key = Hash.generate(JSON.stringify(this.value));
     }
 

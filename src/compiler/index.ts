@@ -14,8 +14,6 @@ export class Compiler {
         const generator = new CodeGenerator(parseTree);
         generator.generate();
 
-        console.log(generator.getOutput());
-
         return { tokens, parseTreeXML, vm: generator.getOutput() };
     }
 }

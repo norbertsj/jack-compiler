@@ -36,6 +36,10 @@ function debug(data: any): void {
     console.dir(data, { depth: null });
 }
 
+function notImplemented() {
+    throw new Error('Not implemented yet');
+}
+
 export class CodeGenerator {
     private readonly vmWriter: VMWriter;
     private classData: ClassData;
@@ -239,6 +243,11 @@ export class CodeGenerator {
                 return;
             }
 
+            if (child.value.type === LexicalElement.KEYWORD && child.value.value === JackKeyword.THIS) {
+                this.vmWriter.writePush(MemorySegment.POINTER, 0);
+                return;
+            }
+
             if (
                 child.value.type === LexicalElement.IDENTIFIER &&
                 child.value.category === IdentifierCategory.VARIABLE &&
@@ -264,6 +273,8 @@ export class CodeGenerator {
             return;
         }
 
+        // console.log('subroutine call');
+        // debug(term);
         // should implement proper subroutine call check..
         this.generateDoStatement(term);
     }
@@ -358,7 +369,7 @@ export class CodeGenerator {
             (child) =>
                 child.value.type === LexicalElement.IDENTIFIER &&
                 child.value.category === IdentifierCategory.CLASS &&
-                child.value.context === IdentifierContext.USAGE
+                child.value.context === IdentifierContext.DECLARATION
         );
 
         if (!node) {

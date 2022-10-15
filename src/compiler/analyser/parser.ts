@@ -33,6 +33,7 @@ export class Parser {
         this.tokenizer = new Tokenizer(input);
         this.classVarTable = new VariableTable();
         this.subroutineVarTable = new VariableTable();
+        this.setToken();
     }
 
     parseClass(): void {
@@ -72,7 +73,6 @@ export class Parser {
     }
 
     private startParseTree(): void {
-        this.setNextToken();
         Validator.validateKeyword(this.token, JackKeyword.CLASS);
 
         this.writeXML('<class>');
@@ -97,7 +97,14 @@ export class Parser {
 
     private setNextToken(): void {
         this.tokenizer.advance();
-        this.token = this.tokenizer.look()!;
+        this.setToken();
+    }
+
+    private setToken(): void {
+        const token = this.tokenizer.look();
+        if (token) {
+            this.token = token;
+        }
     }
 
     private writeXML(xmlString?: string): void {
@@ -602,7 +609,7 @@ export class Parser {
                     break;
                 }
 
-                if (tokenAhead?.value === JackSymbol.BRACKET_OPEN || tokenAhead?.value === JackSymbol.COMMA) {
+                if (tokenAhead?.value === JackSymbol.BRACKET_OPEN || tokenAhead?.value === JackSymbol.DOT) {
                     this.parseSubroutineCall(termNode);
                     break;
                 }
