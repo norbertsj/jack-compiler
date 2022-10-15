@@ -267,16 +267,18 @@ export class CodeGenerator {
             return;
         }
 
-        if (this.isUnaryOp(term)) {
+        if (this.isUnaryOpTerm(term)) {
             this.generateTerm(term.children[1]);
             this.generateOp(term.children[0], true);
             return;
         }
 
-        // console.log('subroutine call');
-        // debug(term);
-        // should implement proper subroutine call check..
-        this.generateDoStatement(term);
+        if (this.isSubroutineCallTerm(term)) {
+            this.generateDoStatement(term);
+            return;
+        }
+
+        notImplemented();
     }
 
     private generateOp(op: ParseTreeNode, isUnary = false): void {
@@ -501,7 +503,7 @@ export class CodeGenerator {
     //#endregion
 
     //#region term
-    private isUnaryOp(term: ParseTreeNode): boolean {
+    private isUnaryOpTerm(term: ParseTreeNode): boolean {
         if (term.children.length === 2) {
             const first = term.children[0];
             const second = term.children[1];
@@ -528,6 +530,31 @@ export class CodeGenerator {
                 third.value.type === LexicalElement.SYMBOL &&
                 third.value.value === JackSymbol.BRACKET_CLOSE
             );
+        }
+
+        return false;
+    }
+
+    private isSubroutineCallTerm(term: ParseTreeNode): boolean {
+        const length = term.children.length;
+        if (length >= 4) {
+            // pattern for last (or only) four nodes: <identifier(usage)> <symbol>( <expressionList> <symbol>)
+            const id = term.children[length - 4];
+            const openBracket = term.children[length - 3];
+            const expressionList = term.children[length - 2];
+            const closeBracket = term.children[length - 1];
+
+            if (
+                id.value.type === LexicalElement.IDENTIFIER &&
+                id.value.context === IdentifierContext.USAGE &&
+                openBracket.value.type === LexicalElement.SYMBOL &&
+                openBracket.value.value === JackSymbol.BRACKET_OPEN &&
+                expressionList.value.type === ParseTreeElement.EXPRESSION_LIST &&
+                closeBracket.value.type === LexicalElement.SYMBOL &&
+                closeBracket.value.value === JackSymbol.BRACKET_CLOSE
+            ) {
+                return true;
+            }
         }
 
         return false;
