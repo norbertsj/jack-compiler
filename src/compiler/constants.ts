@@ -61,6 +61,8 @@ export const KEYWORD_CONSTANTS: JackKeyword[] = [
 
 export const TYPES: JackKeyword[] = [JackKeyword.INT, JackKeyword.CHAR, JackKeyword.BOOLEAN];
 
+export const SUBROUTINE_TYPES: JackKeyword[] = [JackKeyword.CONSTRUCTOR, JackKeyword.FUNCTION, JackKeyword.METHOD];
+
 export const OPERATORS: JackSymbol[] = [
     JackSymbol.PLUS,
     JackSymbol.MINUS,

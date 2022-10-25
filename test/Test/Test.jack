@@ -1,0 +1,18 @@
+class Main {
+    field int x, y;
+    field int size;
+
+    constructor Main new(int Ax, int Ay, int Asize) {
+        let x = Ax;
+        let y = Ay;
+        let size = Asize;
+        // do draw();
+        return this;
+    }
+
+    // method void draw() {
+    //     do Screen.setColor(true);
+    //     do Screen.drawRectangle(x, y, x + size, y + size);
+    //     return;
+    // }
+}

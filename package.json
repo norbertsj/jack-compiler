@@ -8,7 +8,7 @@
     "scripts": {
         "build": "tsc",
         "lint": "npx eslint src",
-        "test": "node build/index test/ConvertToBin --parse-tree --tokens"
+        "test": "node build/index test/Test --parse-tree --tokens"
     },
     "dependencies": {
         "sha3": "^2.1.4"

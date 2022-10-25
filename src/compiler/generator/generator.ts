@@ -1,5 +1,5 @@
 import { VMWriter } from './vm-writer';
-import { OPERATORS, UNARY_OPERATORS } from '../constants';
+import { OPERATORS, SUBROUTINE_TYPES, TYPES, UNARY_OPERATORS } from '../constants';
 import { ParseTree, ParseTreeNode } from '../parse-tree';
 import {
     Command,
@@ -10,8 +10,10 @@ import {
     LexicalElement,
     MemorySegment,
     ParseTreeElement,
+    VariableKind,
 } from '../defines';
 import { VariableData } from '../types';
+import { debug } from '../debug';
 
 export type SubroutineData = {
     returnType: string;
@@ -24,6 +26,7 @@ export type ClassData = {
     vars: ParseTreeNode[];
     whileLoops: number;
     ifStatements: number;
+    constructorExists: boolean;
 };
 
 const defaultSubroutineData: SubroutineData = {
@@ -31,10 +34,6 @@ const defaultSubroutineData: SubroutineData = {
     locals: [],
     args: [],
 };
-
-function debug(data: any): void {
-    console.dir(data, { depth: null });
-}
 
 function notImplemented() {
     throw new Error('Not implemented yet');
@@ -47,11 +46,22 @@ export class CodeGenerator {
 
     constructor(private readonly tree: ParseTree) {
         this.vmWriter = new VMWriter();
-        this.classData = { name: this.findClassName(), vars: [], whileLoops: 0, ifStatements: 0 };
+        this.classData = {
+            name: this.findClassName(),
+            vars: [],
+            whileLoops: 0,
+            ifStatements: 0,
+            constructorExists: false,
+        };
     }
 
     generate(): void {
         for (const node of this.tree.root.children) {
+            if (node.value.type === ParseTreeElement.CLASS_VAR_DEC) {
+                this.setClassVars(node);
+                continue;
+            }
+
             if (node.value.type === ParseTreeElement.SUBROUTINE_DEC) {
                 this.generateSubroutine(node);
                 continue;
@@ -71,6 +81,11 @@ export class CodeGenerator {
         const body = this.findSubroutineBody(subroutine);
 
         this.vmWriter.writeFunction(`${this.classData.name}.${subroutineName}`, varData.nVars);
+
+        if (this.isConstructor(subroutine)) {
+            this.generateConstructorSetup();
+        }
+
         this.generateSubroutineBody(body);
 
         this.clearSubroutineData();
@@ -89,6 +104,23 @@ export class CodeGenerator {
                 continue;
             }
         }
+    }
+
+    private generateConstructorSetup(): void {
+        if (this.classData.constructorExists) {
+            throw new Error('Constructor already exists');
+        }
+
+        // allocate memory for object based on its size (`Memory.alloc` returns objects base address)
+        this.vmWriter.writePush(MemorySegment.CONSTANT, this.classData.vars.length);
+        this.vmWriter.writeCall('Memory.alloc', 1);
+
+        // anchor `this` at objects base address
+        // pointer 0 =  THIS = 0x0003
+        // this      = *THIS = M[0x0003] -> M[n]
+        this.vmWriter.writePop(MemorySegment.POINTER, 0);
+
+        this.classData.constructorExists = true;
     }
 
     private generateStatements(statements: ParseTreeNode): void {
@@ -120,7 +152,16 @@ export class CodeGenerator {
         const varDec = this.findVariableDeclaration(<string>varDef.value.value);
         const expression = this.findExpression(statement);
         this.generateExpression(expression);
-        this.vmWriter.writePop(<MemorySegment>varDec.value.props!.kind, <number>varDec.value.props!.varTableIndex);
+
+        if (!varDec.value.props) {
+            throw new Error('Missing variable properties');
+        }
+
+        const segment =
+            varDec.value.props.kind === VariableKind.FIELD
+                ? MemorySegment.THIS
+                : <MemorySegment>varDec.value.props.kind;
+        this.vmWriter.writePop(segment, <number>varDec.value.props!.varTableIndex);
     }
 
     private generateIfStatement(statement: ParseTreeNode): void {
@@ -177,10 +218,22 @@ export class CodeGenerator {
         let nArgs = 0;
 
         for (const node of statement.children) {
-            if (
-                node.value.type === LexicalElement.IDENTIFIER ||
-                (node.value.type === LexicalElement.SYMBOL && node.value.value === JackSymbol.DOT)
-            ) {
+            if (node.value.type === LexicalElement.IDENTIFIER) {
+                if (node.value.category === IdentifierCategory.VARIABLE) {
+                    this.vmWriter.writePush(
+                        <MemorySegment>node.value.props!.kind,
+                        <number>node.value.props!.varTableIndex
+                    );
+                    nArgs += 1;
+                    name += node.value.props!.type;
+                    continue;
+                }
+
+                name += node.value.value;
+                continue;
+            }
+
+            if (node.value.type === LexicalElement.SYMBOL && node.value.value === JackSymbol.DOT) {
                 name += node.value.value;
                 continue;
             }
@@ -193,6 +246,11 @@ export class CodeGenerator {
         }
 
         this.vmWriter.writeCall(name, nArgs);
+
+        if (statement.value.type === ParseTreeElement.DO) {
+            // void call, dump return value
+            this.vmWriter.writePop(MemorySegment.TEMP, 0);
+        }
     }
 
     private generateExpressionList(expressionList: ParseTreeNode): void {
@@ -243,6 +301,7 @@ export class CodeGenerator {
                 return;
             }
 
+            // could be also `pop` (not there yet..)
             if (child.value.type === LexicalElement.KEYWORD && child.value.value === JackKeyword.THIS) {
                 this.vmWriter.writePush(MemorySegment.POINTER, 0);
                 return;
@@ -344,14 +403,19 @@ export class CodeGenerator {
     }
 
     //#region setters
+    private setClassVars(varDec: ParseTreeNode): void {
+        const vars = this.findIdentifiers(varDec);
+        this.classData.vars = [...this.classData.vars, ...vars];
+    }
+
     private setSubroutineLocalVars(varDec: ParseTreeNode): void {
-        const vars = varDec.children.filter((child) => child.value.type === LexicalElement.IDENTIFIER);
+        const vars = this.findIdentifiers(varDec);
         this.subroutineData.locals = [...this.subroutineData.locals, ...vars];
     }
 
     private setSubroutineArgs(subroutine: ParseTreeNode): void {
         const params = this.findSubroutineParams(subroutine);
-        this.subroutineData.args = params.children.filter((child) => child.value.type === LexicalElement.IDENTIFIER);
+        this.subroutineData.args = this.findIdentifiers(params);
     }
 
     private setSubroutineReturnType(subroutine: ParseTreeNode): void {
@@ -500,6 +564,10 @@ export class CodeGenerator {
 
         return elseStatement;
     }
+
+    private findIdentifiers(parent: ParseTreeNode): ParseTreeNode[] {
+        return parent.children.filter((child) => child.value.type === LexicalElement.IDENTIFIER);
+    }
     //#endregion
 
     //#region term
@@ -558,6 +626,13 @@ export class CodeGenerator {
         }
 
         return false;
+    }
+    //#endregion
+
+    //#region checks
+    private isConstructor(subroutine: ParseTreeNode): boolean {
+        const first = subroutine.children[0];
+        return first.value.type === LexicalElement.KEYWORD && first.value.value === JackKeyword.CONSTRUCTOR;
     }
     //#endregion
 }

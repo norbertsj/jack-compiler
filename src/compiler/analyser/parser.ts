@@ -1,4 +1,5 @@
-import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from '../constants';
+import { debug } from '../debug';
+import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, TYPES, UNARY_OPERATORS } from '../constants';
 import {
     IdentifierCategory,
     IdentifierContext,
@@ -653,11 +654,23 @@ export class Parser {
         return this.subroutineVarTable.find(name);
     }
 
-    private parseSubroutineCall(parent: ParseTreeNode): void {
+    private getSubroutineCallIdentifierData(): { category: IdentifierCategory; variable?: Variable } {
         const tokenAhead = this.tokenizer.lookAhead();
-        const category =
-            tokenAhead?.value === JackSymbol.BRACKET_OPEN ? IdentifierCategory.SUBROUTINE : IdentifierCategory.CLASS;
-        this.parseIdentifier(parent, category, IdentifierContext.USAGE);
+        if (tokenAhead?.value === JackSymbol.DOT) {
+            const variable = this.findVariable(<string>this.token.value);
+            if (variable) {
+                return { category: IdentifierCategory.VARIABLE, variable };
+            }
+
+            return { category: IdentifierCategory.CLASS };
+        }
+
+        return { category: IdentifierCategory.SUBROUTINE };
+    }
+
+    private parseSubroutineCall(parent: ParseTreeNode): void {
+        const { category, variable } = this.getSubroutineCallIdentifierData();
+        this.parseIdentifier(parent, category, IdentifierContext.USAGE, variable);
 
         this.setNextToken();
         this.parseOneOfSymbols(parent, [JackSymbol.BRACKET_OPEN, JackSymbol.DOT]);
