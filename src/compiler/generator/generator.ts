@@ -86,6 +86,12 @@ export class CodeGenerator {
             this.generateConstructorSetup();
         }
 
+        if (this.isMethod(subroutine)) {
+            // set argument 0 as this
+            this.vmWriter.writePush(MemorySegment.ARGUMENT, 0);
+            this.vmWriter.writePop(MemorySegment.POINTER, 0);
+        }
+
         this.generateSubroutineBody(body);
 
         this.clearSubroutineData();
@@ -157,11 +163,7 @@ export class CodeGenerator {
             throw new Error('Missing variable properties');
         }
 
-        const segment =
-            varDec.value.props.kind === VariableKind.FIELD
-                ? MemorySegment.THIS
-                : <MemorySegment>varDec.value.props.kind;
-        this.vmWriter.writePop(segment, <number>varDec.value.props!.varTableIndex);
+        this.vmWriter.writePop(this.findVariableSegment(varDec), <number>varDec.value.props!.varTableIndex);
     }
 
     private generateIfStatement(statement: ParseTreeNode): void {
@@ -213,19 +215,28 @@ export class CodeGenerator {
         this.vmWriter.writeLabel(endLabel);
     }
 
+    // maybe rewrite this, so its more understandable..
     private generateDoStatement(statement: ParseTreeNode): void {
+        const isStaticCall = this.isStaticCall(statement);
         let name = '';
         let nArgs = 0;
+        let classProbablyUsed = false;
 
         for (const node of statement.children) {
             if (node.value.type === LexicalElement.IDENTIFIER) {
                 if (node.value.category === IdentifierCategory.VARIABLE) {
-                    this.vmWriter.writePush(
-                        <MemorySegment>node.value.props!.kind,
-                        <number>node.value.props!.varTableIndex
-                    );
+                    this.vmWriter.writePush(this.findVariableSegment(node), <number>node.value.props!.varTableIndex);
                     nArgs += 1;
                     name += node.value.props!.type;
+                    classProbablyUsed = true;
+                    continue;
+                }
+
+                if (!isStaticCall && !classProbablyUsed) {
+                    // assuming this is current class method call
+                    this.vmWriter.writePush(MemorySegment.POINTER, 0);
+                    nArgs += 1;
+                    name += `${this.classData.name}.${node.value.value}`;
                     continue;
                 }
 
@@ -312,10 +323,7 @@ export class CodeGenerator {
                 child.value.category === IdentifierCategory.VARIABLE &&
                 child.value.context === IdentifierContext.USAGE
             ) {
-                this.vmWriter.writePush(
-                    <MemorySegment>child.value.props!.kind,
-                    <number>child.value.props!.varTableIndex
-                );
+                this.vmWriter.writePush(this.findVariableSegment(child), <number>child.value.props!.varTableIndex);
                 return;
             }
         }
@@ -519,6 +527,12 @@ export class CodeGenerator {
         return <VariableData>node.value.props;
     }
 
+    private findVariableSegment(variable: ParseTreeNode): MemorySegment {
+        return variable.value.props!.kind === VariableKind.FIELD
+            ? MemorySegment.THIS
+            : <MemorySegment>variable.value.props!.kind;
+    }
+
     private findReturnType(subroutine: ParseTreeNode): string {
         const node = subroutine.children.find((child) => child.value.type === ParseTreeElement.RETURN_TYPE);
 
@@ -633,6 +647,18 @@ export class CodeGenerator {
     private isConstructor(subroutine: ParseTreeNode): boolean {
         const first = subroutine.children[0];
         return first.value.type === LexicalElement.KEYWORD && first.value.value === JackKeyword.CONSTRUCTOR;
+    }
+
+    private isMethod(subroutine: ParseTreeNode): boolean {
+        const first = subroutine.children[0];
+        return first.value.type === LexicalElement.KEYWORD && first.value.value === JackKeyword.METHOD;
+    }
+
+    private isStaticCall(doStatement: ParseTreeNode): boolean {
+        const classIdentifier = this.findIdentifiers(doStatement).find(
+            (id) => id.value.category === IdentifierCategory.CLASS && id.value.context === IdentifierContext.USAGE
+        );
+        return typeof classIdentifier !== 'undefined';
     }
     //#endregion
 }
