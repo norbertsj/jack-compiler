@@ -1,6 +1,5 @@
-import { VMWriter } from './vm-writer';
-import { OPERATORS, SUBROUTINE_TYPES, TYPES, UNARY_OPERATORS } from '../constants';
-import { ParseTree, ParseTreeNode } from '../parse-tree';
+import { OPERATORS, UNARY_OPERATORS } from '../constants';
+import { debug } from '../debug';
 import {
     Command,
     IdentifierCategory,
@@ -12,8 +11,9 @@ import {
     ParseTreeElement,
     VariableKind,
 } from '../defines';
+import { ParseTree, ParseTreeNode } from '../parse-tree';
 import { VariableData } from '../types';
-import { debug } from '../debug';
+import { VMWriter } from './vm-writer';
 
 export type SubroutineData = {
     returnType: string;
@@ -156,6 +156,12 @@ export class CodeGenerator {
     private generateLetStatement(statement: ParseTreeNode): void {
         const varDef = this.findVariableDefinition(statement);
         const varDec = this.findVariableDeclaration(<string>varDef.value.value);
+
+        if (this.isArray(statement)) {
+            this.generateArrayAssignment(varDec, statement);
+            return;
+        }
+
         const expression = this.findExpression(statement);
         this.generateExpression(expression);
 
@@ -312,6 +318,11 @@ export class CodeGenerator {
                 return;
             }
 
+            if (child.value.type === LexicalElement.STRING) {
+                this.generateString(child);
+                return;
+            }
+
             // could be also `pop` (not there yet..)
             if (child.value.type === LexicalElement.KEYWORD && child.value.value === JackKeyword.THIS) {
                 this.vmWriter.writePush(MemorySegment.POINTER, 0);
@@ -324,6 +335,19 @@ export class CodeGenerator {
                 child.value.context === IdentifierContext.USAGE
             ) {
                 this.vmWriter.writePush(this.findVariableSegment(child), <number>child.value.props!.varTableIndex);
+                if (!this.isArray(child)) {
+                    return;
+                }
+
+                // find and generate array index expression and sum it with base address (pushed above)
+                const indexExpression = this.findExpression(child);
+                this.generateExpression(indexExpression);
+                this.vmWriter.writeArithmetic(Command.ADD);
+
+                // set that segment and push the indexed array value on stack
+                this.vmWriter.writePop(MemorySegment.POINTER, 1);
+                this.vmWriter.writePush(MemorySegment.THAT, 0);
+
                 return;
             }
         }
@@ -345,7 +369,21 @@ export class CodeGenerator {
             return;
         }
 
+        debug(term);
         notImplemented();
+    }
+
+    private generateString(string: ParseTreeNode): void {
+        const stringValue = <string>string.value.value;
+        const stringLength = stringValue.length;
+
+        this.vmWriter.writePush(MemorySegment.CONSTANT, stringLength);
+        this.vmWriter.writeCall('String.new', 1); // return value just sits on stack..
+
+        for (let i = 0; i < stringLength; i++) {
+            this.vmWriter.writePush(MemorySegment.CONSTANT, stringValue.charCodeAt(i));
+            this.vmWriter.writeCall('String.appendChar', 2); // arg 0 = string object, arg 1 = char code
+        }
     }
 
     private generateOp(op: ParseTreeNode, isUnary = false): void {
@@ -404,6 +442,32 @@ export class CodeGenerator {
         }
 
         this.vmWriter.writeReturn();
+    }
+
+    private generateArrayAssignment(varDec: ParseTreeNode, statement: ParseTreeNode): void {
+        // using varDec info push arrays base address to stack
+        this.vmWriter.writePush(this.findVariableSegment(varDec), <number>varDec.value.props!.varTableIndex);
+
+        // find and generate index expression
+        const indexExpression = this.findExpression(statement);
+        this.generateExpression(indexExpression);
+
+        // add (now we have base + index on stack)
+        this.vmWriter.writeArithmetic(Command.ADD);
+
+        // find and generate right hand expression
+        const valueExpression = this.findAnyOtherExpression(statement, indexExpression.key);
+        this.generateExpression(valueExpression);
+
+        // pop its value to temp 0
+        this.vmWriter.writePop(MemorySegment.TEMP, 0);
+
+        // now we have array base + index left on stack, set it as that segment
+        this.vmWriter.writePop(MemorySegment.POINTER, 1);
+
+        // now push right hand expression value on the stack and then assign to array
+        this.vmWriter.writePush(MemorySegment.TEMP, 0);
+        this.vmWriter.writePop(MemorySegment.THAT, 0);
     }
 
     private clearSubroutineData(): void {
@@ -552,6 +616,19 @@ export class CodeGenerator {
         return node;
     }
 
+    // will find first expression node on the same level (useful if looking for subsequent expression)
+    // @todo: consider different approach
+    private findAnyOtherExpression(parent: ParseTreeNode, excludeNodeKey: string): ParseTreeNode {
+        const node = parent.children.find(
+            (child) => child.value.type === ParseTreeElement.EXPRESSION && excludeNodeKey !== child.key
+        );
+        if (!node) {
+            throw new Error('Could not find expression');
+        }
+
+        return node;
+    }
+
     private findExpressionList(parent: ParseTreeNode): ParseTreeNode {
         const node = parent.children.find((child) => child.value.type === ParseTreeElement.EXPRESSION_LIST);
         if (!node) {
@@ -659,6 +736,15 @@ export class CodeGenerator {
             (id) => id.value.category === IdentifierCategory.CLASS && id.value.context === IdentifierContext.USAGE
         );
         return typeof classIdentifier !== 'undefined';
+    }
+
+    private isArray(parent: ParseTreeNode): boolean {
+        const squareBracket = parent.children.find(
+            (child) =>
+                child.value.type === LexicalElement.SYMBOL && child.value.value === JackSymbol.SQUARE_BRACKET_OPEN
+        );
+
+        return typeof squareBracket !== 'undefined';
     }
     //#endregion
 }
