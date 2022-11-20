@@ -63,6 +63,8 @@ export class Validator {
     }
 
     private static throwError(expected: string, token: Token): void {
-        throw new Error(`${expected} expected, got ${token.type} "${token.value}" instead`);
+        throw new Error(
+            `${expected} expected, got ${token.type} "${token.value}" instead (${token.fileName}:${token.lineNumber})`
+        );
     }
 }

@@ -1,13 +1,13 @@
 import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from '../constants';
 import { LexicalElement } from '../defines';
-import { Token } from '../types';
+import { NumberedInput, Token } from '../types';
 
 export class Tokenizer {
     private readonly tokens: Token[];
     private currentTokenIndex = 0;
 
-    constructor(input: string[]) {
-        this.tokens = this.tokenize(this.removeComments(input));
+    constructor(private readonly fileName: string, input: string[]) {
+        this.tokens = this.tokenize(this.preProcess(input));
     }
 
     hasMoreTokens(): boolean {
@@ -46,37 +46,81 @@ export class Tokenizer {
         return ['<tokens>', ...this.tokens.map((t) => t.xml), '</tokens>'];
     }
 
-    private removeComments(input: string[]): string[] {
-        // joining the input lines and applying regexp to multiline string
-        return input
-            .join('\n')
-            .replace(/\/+\*([\s\S]*?)\*\//gm, '')
-            .replace(/\/{2}.*$/gm, '')
-            .trim()
-            .split('\n')
-            .filter((line) => line.length > 0);
+    private addLineNumbers(input: string[]): NumberedInput[] {
+        return input.map((line, index) => ({
+            line,
+            lineNumber: index + 1,
+        }));
     }
 
-    private tokenize(input: string[]): Token[] {
+    private removeSingleLineComments(input: NumberedInput[]): NumberedInput[] {
+        return input.map((item) => ({
+            ...item,
+            line: item.line
+                .replace(/\/+\*([\s\S]*?)\*\//, '')
+                .replace(/\/{2}.*$/, '')
+                .trim(),
+        }));
+    }
+
+    private removeMultilineComments(input: NumberedInput[]): NumberedInput[] {
+        const output: NumberedInput[] = [];
+        let multilineComment = false;
+
+        for (const item of input) {
+            if (/\/{1}\*+.*$/.test(item.line)) {
+                multilineComment = true;
+                output.push({ ...item, line: item.line.replace(/\/{1}\*+.*$/, '') });
+                continue;
+            }
+
+            if (item.line.endsWith('*/')) {
+                multilineComment = false;
+                continue;
+            }
+
+            if (multilineComment) {
+                continue;
+            }
+
+            output.push(item);
+        }
+
+        return output;
+    }
+
+    private removeEmptyLines(input: NumberedInput[]): NumberedInput[] {
+        return input.filter((item) => item.line !== '' && item.line !== ' ');
+    }
+
+    private preProcess(input: string[]): NumberedInput[] {
+        return this.removeEmptyLines(
+            this.removeMultilineComments(this.removeSingleLineComments(this.addLineNumbers(input)))
+        );
+    }
+
+    private tokenize(input: NumberedInput[]): Token[] {
         let tokens: Token[] = [];
 
-        for (const line of input) {
-            const rawTokens = line
+        for (const item of input) {
+            const rawTokens = item.line
                 .split(TOKEN_SEPARATOR_REGEXP)
-                .filter((rt) => rt !== '' && rt !== ' ')
+                .filter((str) => str !== '' && str !== ' ')
                 .map((t) => t.trim());
-            const generatedTokens = rawTokens.map((t) => this.generateToken(t));
+            const generatedTokens = rawTokens.map((t) => this.generateToken(item.lineNumber, t));
             tokens = [...tokens, ...generatedTokens];
         }
 
         return tokens;
     }
 
-    private generateToken(value: string): Token {
+    private generateToken(lineNumber: number, value: string): Token {
         const token: Token = {
             value,
             type: LexicalElement.IDENTIFIER,
             xml: `<identifier>${value}</identifier>`,
+            fileName: this.fileName + '.jack',
+            lineNumber,
         };
 
         if (KEYWORDS.includes(value)) {

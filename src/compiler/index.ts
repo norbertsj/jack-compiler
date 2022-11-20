@@ -8,8 +8,8 @@ export type CompilerOutput = {
 };
 
 export class Compiler {
-    static compile(input: string[]): CompilerOutput {
-        const { tokens, parseTree, parseTreeXML } = SyntaxAnalyser.analyseClass(input);
+    static compile(fileName: string, input: string[]): CompilerOutput {
+        const { tokens, parseTree, parseTreeXML } = SyntaxAnalyser.analyseClass(fileName, input);
 
         const generator = new CodeGenerator(parseTree);
         generator.generate();

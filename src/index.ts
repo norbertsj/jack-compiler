@@ -15,7 +15,7 @@ class Main {
         const compiledFiles: File[] = [];
 
         for (const file of files) {
-            const { tokens, parseTreeXML, vm } = Compiler.compile(file.data);
+            const { tokens, parseTreeXML, vm } = Compiler.compile(file.name, file.data);
 
             compiledFiles.push({
                 name: file.name,
