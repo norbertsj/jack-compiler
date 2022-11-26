@@ -39,16 +39,21 @@ export class Parser {
 
     parseClass(): void {
         this.startParseTree();
+
         this.setNextToken();
         this.parseIdentifier(this.parseTree.root, IdentifierCategory.CLASS, IdentifierContext.DECLARATION);
+
         this.setNextToken();
         this.parseSymbol(this.parseTree.root, JackSymbol.CURLY_BRACKET_OPEN);
+
         while (this.tokenizer.hasMoreTokens()) {
             this.setNextToken();
+
             if ([VariableKind.STATIC, VariableKind.FIELD].includes(<VariableKind>this.token.value)) {
                 this.parseClassVarDec(this.parseTree.root);
                 continue;
             }
+
             if (
                 [JackKeyword.CONSTRUCTOR, JackKeyword.FUNCTION, JackKeyword.METHOD].includes(
                     <JackKeyword>this.token.value
@@ -57,8 +62,10 @@ export class Parser {
                 this.parseSubroutineDec(this.parseTree.root);
                 continue;
             }
+
             this.parseSymbol(this.parseTree.root, JackSymbol.CURLY_BRACKET_CLOSE);
         }
+
         this.finishParseTree();
     }
 

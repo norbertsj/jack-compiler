@@ -1,6 +1,7 @@
 import { Token } from '../types';
 import { TYPES, INTEGER_MIN, INTEGER_MAX } from '../constants';
 import { LexicalElement } from '../defines';
+import { JackSyntaxError } from '../error';
 
 export class Validator {
     static validateIdentifier(token: Token): void {
@@ -63,7 +64,7 @@ export class Validator {
     }
 
     private static throwError(expected: string, token: Token): void {
-        throw new Error(
+        throw new JackSyntaxError(
             `${expected} expected, got ${token.type} "${token.value}" instead (${token.fileName}:${token.lineNumber})`
         );
     }

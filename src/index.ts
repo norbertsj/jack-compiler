@@ -1,4 +1,5 @@
 import { Compiler } from './compiler';
+import { JackSyntaxError } from './compiler/error';
 import { File, IO } from './io';
 
 class Main {
@@ -48,4 +49,11 @@ class Main {
 }
 
 const program = new Main();
-program.main().catch((e: Error) => console.error(e.stack));
+program.main().catch((e: Error) => {
+    if (e instanceof JackSyntaxError) {
+        console.error('SyntaxError:', e.message);
+        return;
+    }
+
+    console.error(e.stack);
+});

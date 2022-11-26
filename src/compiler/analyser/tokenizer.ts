@@ -64,13 +64,14 @@ export class Tokenizer {
     }
 
     private removeMultilineComments(input: NumberedInput[]): NumberedInput[] {
+        const rgx = new RegExp(/\/{1}\*+.*$/);
         const output: NumberedInput[] = [];
         let multilineComment = false;
 
         for (const item of input) {
-            if (/\/{1}\*+.*$/.test(item.line)) {
+            if (rgx.test(item.line)) {
                 multilineComment = true;
-                output.push({ ...item, line: item.line.replace(/\/{1}\*+.*$/, '') });
+                output.push({ ...item, line: item.line.replace(rgx, '') });
                 continue;
             }
 
