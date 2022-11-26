@@ -19,6 +19,7 @@ export type SubroutineData = {
     returnType: string;
     locals: ParseTreeNode[];
     args: ParseTreeNode[];
+    isMethod: boolean;
 };
 
 export type ClassData = {
@@ -33,6 +34,7 @@ const defaultSubroutineData: SubroutineData = {
     returnType: 'void',
     locals: [],
     args: [],
+    isMethod: false,
 };
 
 function notImplemented() {
@@ -86,7 +88,7 @@ export class CodeGenerator {
             this.generateConstructorSetup();
         }
 
-        if (this.isMethod(subroutine)) {
+        if (this.subroutineData.isMethod) {
             // set argument 0 as this
             this.vmWriter.writePush(MemorySegment.ARGUMENT, 0);
             this.vmWriter.writePop(MemorySegment.POINTER, 0);
@@ -118,7 +120,7 @@ export class CodeGenerator {
         }
 
         // allocate memory for object based on its size (`Memory.alloc` returns objects base address)
-        this.vmWriter.writePush(MemorySegment.CONSTANT, this.classData.vars.length);
+        this.vmWriter.writePush(MemorySegment.CONSTANT, this.findInstanceVariableCount());
         this.vmWriter.writeCall('Memory.alloc', 1);
 
         // anchor `this` at objects base address
@@ -169,7 +171,7 @@ export class CodeGenerator {
             throw new Error('Missing variable properties');
         }
 
-        this.vmWriter.writePop(this.findVariableSegment(varDec), <number>varDec.value.props!.varTableIndex);
+        this.generateVariablePop(varDec);
     }
 
     private generateIfStatement(statement: ParseTreeNode): void {
@@ -231,7 +233,7 @@ export class CodeGenerator {
         for (const node of statement.children) {
             if (node.value.type === LexicalElement.IDENTIFIER) {
                 if (node.value.category === IdentifierCategory.VARIABLE) {
-                    this.vmWriter.writePush(this.findVariableSegment(node), <number>node.value.props!.varTableIndex);
+                    this.generateVariablePush(node);
                     nArgs += 1;
                     name += node.value.props!.type;
                     classProbablyUsed = true;
@@ -268,6 +270,16 @@ export class CodeGenerator {
             // void call, dump return value
             this.vmWriter.writePop(MemorySegment.TEMP, 0);
         }
+    }
+
+    private generateVariablePush(variable: ParseTreeNode): void {
+        const { segment, index } = this.findVariableSegmentAndIndex(variable);
+        this.vmWriter.writePush(segment, index);
+    }
+
+    private generateVariablePop(variable: ParseTreeNode): void {
+        const { segment, index } = this.findVariableSegmentAndIndex(variable);
+        this.vmWriter.writePop(segment, index);
     }
 
     private generateExpressionList(expressionList: ParseTreeNode): void {
@@ -334,7 +346,8 @@ export class CodeGenerator {
                 child.value.category === IdentifierCategory.VARIABLE &&
                 child.value.context === IdentifierContext.USAGE
             ) {
-                this.vmWriter.writePush(this.findVariableSegment(child), <number>child.value.props!.varTableIndex);
+                this.generateVariablePush(child);
+
                 if (!this.isArray(child)) {
                     return;
                 }
@@ -446,7 +459,7 @@ export class CodeGenerator {
 
     private generateArrayAssignment(varDec: ParseTreeNode, statement: ParseTreeNode): void {
         // using varDec info push arrays base address to stack
-        this.vmWriter.writePush(this.findVariableSegment(varDec), <number>varDec.value.props!.varTableIndex);
+        this.generateVariablePush(varDec);
 
         // find and generate index expression
         const indexExpression = this.findExpression(statement);
@@ -497,6 +510,7 @@ export class CodeGenerator {
     private setSubroutineData(subroutine: ParseTreeNode): void {
         this.setSubroutineReturnType(subroutine);
         this.setSubroutineArgs(subroutine);
+        this.subroutineData.isMethod = this.isMethod(subroutine);
     }
 
     //#endregion
@@ -658,6 +672,27 @@ export class CodeGenerator {
 
     private findIdentifiers(parent: ParseTreeNode): ParseTreeNode[] {
         return parent.children.filter((child) => child.value.type === LexicalElement.IDENTIFIER);
+    }
+
+    private findInstanceVariableCount(): number {
+        let count = 0;
+
+        for (const node of this.classData.vars) {
+            const segment = this.findVariableSegment(node);
+            if (segment === MemorySegment.THIS) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private findVariableSegmentAndIndex(variable: ParseTreeNode): { segment: MemorySegment; index: number } {
+        const segment = this.findVariableSegment(variable);
+        const varTableIndex = <number>variable.value.props!.varTableIndex;
+        const index =
+            segment === MemorySegment.ARGUMENT && this.subroutineData.isMethod ? varTableIndex + 1 : varTableIndex;
+        return { segment, index };
     }
     //#endregion
 
