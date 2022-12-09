@@ -78,7 +78,9 @@ export const OPERATORS: JackSymbol[] = [
 export const UNARY_OPERATORS: string[] = [JackSymbol.MINUS, JackSymbol.NOT];
 
 export const TOKEN_SEPARATOR_REGEXP =
-    /(?=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])|(?<=[\{|\}|\(|\)|\[|\]|\.|\,|\;|\+|\-|\*|\/|\&|\<|\>|\=|\~])|[\s](?=(?:[^"]*"[^"]*")*[^"]*$)/g;
+    /(?=[\s\{\}\(\)\[\]\.\,\;\+\-\*\/\&\>\<\=\~])|(?<=[\s\{\}\(\)\[\]\.\,\;\+\-\*\/\&\>\<\=\~])/g;
+
+export const STRING_SEPARATOR_REGEXP = /(?=\".*\")|(?<=\".*\")/g;
 
 export const INTEGER_MIN = 0;
 export const INTEGER_MAX = 32767;

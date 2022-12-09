@@ -1,4 +1,4 @@
-import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP } from '../constants';
+import { KEYWORDS, SYMBOLS, MARKUP_SYMBOLS_MAP, TOKEN_SEPARATOR_REGEXP, STRING_SEPARATOR_REGEXP } from '../constants';
 import { LexicalElement } from '../defines';
 import { NumberedInput, Token } from '../types';
 
@@ -104,15 +104,34 @@ export class Tokenizer {
         let tokens: Token[] = [];
 
         for (const item of input) {
-            const rawTokens = item.line
-                .split(TOKEN_SEPARATOR_REGEXP)
-                .filter((str) => str !== '' && str !== ' ')
-                .map((t) => t.trim());
-            const generatedTokens = rawTokens.map((t) => this.generateToken(item.lineNumber, t));
+            const rawTokens = this.getRawTokensFromLine(item.line);
+            const generatedTokens = rawTokens.map((x) => this.generateToken(item.lineNumber, x));
             tokens = [...tokens, ...generatedTokens];
         }
 
         return tokens;
+    }
+
+    private getRawTokensFromLine(line: string): string[] {
+        // split line by strings first
+        const stringSplitLine = line.split(STRING_SEPARATOR_REGEXP);
+        let rawTokens: string[] = [];
+
+        for (const linePart of stringSplitLine) {
+            if (linePart.startsWith('"') && linePart.endsWith('"')) {
+                rawTokens.push(linePart);
+                continue;
+            }
+
+            // line part is not a string, lets split it by token separators
+            const lineTokens = linePart
+                .split(TOKEN_SEPARATOR_REGEXP)
+                .filter((x) => x !== '' && x !== ' ')
+                .map((x) => x.trim());
+            rawTokens = [...rawTokens, ...lineTokens];
+        }
+
+        return rawTokens;
     }
 
     private generateToken(lineNumber: number, value: string): Token {
