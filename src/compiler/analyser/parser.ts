@@ -1,12 +1,11 @@
-import { debug } from '../debug';
-import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, TYPES, UNARY_OPERATORS } from '../constants';
+import { INDENT_SIZE, KEYWORD_CONSTANTS, OPERATORS, UNARY_OPERATORS } from '../constants';
 import {
     IdentifierCategory,
     IdentifierContext,
     JackKeyword,
+    JackSymbol,
     LexicalElement,
     ParseTreeElement,
-    JackSymbol,
     VariableKind,
 } from '../defines';
 import { ParseTree, ParseTreeNode, ParseTreeNodeValue } from '../parse-tree';
