@@ -1,6 +1,8 @@
 import { SyntaxAnalyser } from './analyser';
 import { CodeGenerator } from './generator';
 
+export { JackSyntaxError } from './error';
+
 export type CompilerOutput = {
     tokens: string[];
     parseTreeXML: string[];

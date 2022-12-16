@@ -15,6 +15,12 @@ export type PathInfo = {
     stats: Stats;
 };
 
+export class IOError extends Error {
+    constructor(message: string) {
+        super(message);
+    }
+}
+
 export class IO {
     static readFile(filePath: string): Promise<string[]> {
         return new Promise((resolve) => {

@@ -1,4 +1,5 @@
 import { VariableKind } from '../defines';
+import { JackSyntaxError } from '../error';
 
 export interface VariableInput {
     name: string;
@@ -41,7 +42,9 @@ export class VariableTable {
     private checkDuplicate(variable: VariableInput): void {
         const index = this.variables.findIndex((v) => v.name === variable.name);
         if (index !== -1) {
-            throw new Error(`Duplicate ${variable.kind} variable identifier: ${variable.type} ${variable.name}`);
+            throw new JackSyntaxError(
+                `Duplicate ${variable.kind} variable identifier: ${variable.type} ${variable.name}`
+            );
         }
     }
 }

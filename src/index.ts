@@ -1,6 +1,5 @@
-import { Compiler } from './compiler';
-import { JackSyntaxError } from './compiler/error';
-import { File, IO } from './io';
+import { Compiler, JackSyntaxError } from './compiler';
+import { File, IO, IOError } from './io';
 
 class Main {
     async main(): Promise<void> {
@@ -52,6 +51,11 @@ const program = new Main();
 program.main().catch((e: Error) => {
     if (e instanceof JackSyntaxError) {
         console.error('SyntaxError:', e.message);
+        return;
+    }
+
+    if (e instanceof IOError) {
+        console.error('IOError:', e.message);
         return;
     }
 

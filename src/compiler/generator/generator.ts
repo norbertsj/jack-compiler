@@ -10,6 +10,7 @@ import {
     ParseTreeElement,
     VariableKind,
 } from '../defines';
+import { JackSyntaxError } from '../error';
 import { ParseTree, ParseTreeNode } from '../parse-tree';
 import { VariableData } from '../types';
 import { VMWriter } from './vm-writer';
@@ -111,7 +112,7 @@ export class CodeGenerator {
 
     private generateConstructorSetup(): void {
         if (this.classData.constructorExists) {
-            throw new Error('Constructor already exists');
+            throw new JackSyntaxError('Constructor already exists');
         }
 
         // allocate memory for object based on its size (`Memory.alloc` returns objects base address)
@@ -163,7 +164,7 @@ export class CodeGenerator {
         this.generateExpression(expression);
 
         if (!varDec.value.props) {
-            throw new Error('Missing variable properties');
+            throw new JackSyntaxError('Missing variable properties');
         }
 
         this.generateVariablePop(varDec);
@@ -517,7 +518,7 @@ export class CodeGenerator {
         );
 
         if (!node) {
-            throw new Error('Could not find class declaration');
+            throw new JackSyntaxError('Could not find class declaration');
         }
 
         return <string>node.value.value;
@@ -531,7 +532,7 @@ export class CodeGenerator {
         const variable = subLocal || subArg || classVar;
 
         if (!variable) {
-            throw new Error('Could not find variable');
+            throw new JackSyntaxError('Could not find variable');
         }
 
         return variable;
@@ -546,7 +547,7 @@ export class CodeGenerator {
         );
 
         if (!node) {
-            throw new Error('Could not find variable definition');
+            throw new JackSyntaxError('Could not find variable definition');
         }
 
         return node;
@@ -556,7 +557,7 @@ export class CodeGenerator {
         const node = subroutine.children.find((child) => child.value.type === ParseTreeElement.PARAM_LIST);
 
         if (!node) {
-            throw new Error('Could not find param list');
+            throw new JackSyntaxError('Could not find param list');
         }
 
         return node;
@@ -566,7 +567,7 @@ export class CodeGenerator {
         const node = subroutine.children.find((child) => child.value.type === ParseTreeElement.SUBROUTINE_BODY);
 
         if (!node) {
-            throw new Error('Could not find subroutine body');
+            throw new JackSyntaxError('Could not find subroutine body');
         }
 
         return node;
@@ -581,7 +582,7 @@ export class CodeGenerator {
         );
 
         if (!node) {
-            throw new Error('Could not find subroutine declaration');
+            throw new JackSyntaxError('Could not find subroutine declaration');
         }
 
         return <string>node.value.value;
@@ -591,7 +592,7 @@ export class CodeGenerator {
         const node = subroutine.children.find((child) => child.value.type === ParseTreeElement.VAR_DATA);
 
         if (!node) {
-            throw new Error(`Could not find variable data for subroutine: ${subroutineName}`);
+            throw new JackSyntaxError(`Could not find variable data for subroutine: ${subroutineName}`);
         }
 
         return <VariableData>node.value.props;
@@ -607,7 +608,7 @@ export class CodeGenerator {
         const node = subroutine.children.find((child) => child.value.type === ParseTreeElement.RETURN_TYPE);
 
         if (!node) {
-            throw new Error('Could not find subroutine return type');
+            throw new JackSyntaxError('Could not find subroutine return type');
         }
 
         return <string>node.value.value;
@@ -616,7 +617,7 @@ export class CodeGenerator {
     private findExpression(parent: ParseTreeNode): ParseTreeNode {
         const node = parent.children.find((child) => child.value.type === ParseTreeElement.EXPRESSION);
         if (!node) {
-            throw new Error('Could not find expression');
+            throw new JackSyntaxError('Could not find expression');
         }
 
         return node;
@@ -628,7 +629,7 @@ export class CodeGenerator {
             (child) => child.value.type === ParseTreeElement.EXPRESSION && excludeNodeKey !== child.key
         );
         if (!node) {
-            throw new Error('Could not find expression');
+            throw new JackSyntaxError('Could not find expression');
         }
 
         return node;
@@ -637,7 +638,7 @@ export class CodeGenerator {
     private findStatements(parent: ParseTreeNode): ParseTreeNode {
         const node = parent.children.find((child) => child.value.type === ParseTreeElement.STATEMENTS);
         if (!node) {
-            throw new Error('Could not find statements');
+            throw new JackSyntaxError('Could not find statements');
         }
 
         return node;
