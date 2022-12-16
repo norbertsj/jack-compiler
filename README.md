@@ -33,3 +33,10 @@ node build/index Pong --parse-tree --tokens
 <img src="docs/jack-lexical-elements.png">
 <img src="docs/jack-program-structure.png">
 <img src="docs/jack-statements.png">
+
+## Notes
+
+Improvements that `could` be made:
+
+-   Better error handling with more precise syntax and semantic checks
+-   Bytecode optimizations
