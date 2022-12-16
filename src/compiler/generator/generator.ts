@@ -1,5 +1,4 @@
 import { OPERATORS, UNARY_OPERATORS } from '../constants';
-import { debug } from '../debug';
 import {
     Command,
     IdentifierCategory,
@@ -36,10 +35,6 @@ const defaultSubroutineData: SubroutineData = {
     args: [],
     isMethod: false,
 };
-
-function notImplemented() {
-    throw new Error('Not implemented yet');
-}
 
 export class CodeGenerator {
     private readonly vmWriter: VMWriter;
@@ -335,7 +330,6 @@ export class CodeGenerator {
                 return;
             }
 
-            // could be also `pop` (not there yet..)
             if (child.value.type === LexicalElement.KEYWORD && child.value.value === JackKeyword.THIS) {
                 this.vmWriter.writePush(MemorySegment.POINTER, 0);
                 return;
@@ -381,9 +375,6 @@ export class CodeGenerator {
             this.generateDoStatement(term);
             return;
         }
-
-        debug(term);
-        notImplemented();
     }
 
     private generateString(string: ParseTreeNode): void {
@@ -510,6 +501,7 @@ export class CodeGenerator {
     private setSubroutineData(subroutine: ParseTreeNode): void {
         this.setSubroutineReturnType(subroutine);
         this.setSubroutineArgs(subroutine);
+        this.subroutineData.locals = [];
         this.subroutineData.isMethod = this.isMethod(subroutine);
     }
 
@@ -631,22 +623,12 @@ export class CodeGenerator {
     }
 
     // will find first expression node on the same level (useful if looking for subsequent expression)
-    // @todo: consider different approach
     private findAnyOtherExpression(parent: ParseTreeNode, excludeNodeKey: string): ParseTreeNode {
         const node = parent.children.find(
             (child) => child.value.type === ParseTreeElement.EXPRESSION && excludeNodeKey !== child.key
         );
         if (!node) {
             throw new Error('Could not find expression');
-        }
-
-        return node;
-    }
-
-    private findExpressionList(parent: ParseTreeNode): ParseTreeNode {
-        const node = parent.children.find((child) => child.value.type === ParseTreeElement.EXPRESSION_LIST);
-        if (!node) {
-            throw new Error('Could not find expression list');
         }
 
         return node;

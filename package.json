@@ -8,7 +8,13 @@
     "scripts": {
         "build": "tsc",
         "lint": "npx eslint src",
-        "test": "node build/index test/Test --parse-tree --tokens"
+        "test": "npm-run-all test:*",
+        "test:average": "node build/index test/Average --parse-tree --tokens",
+        "test:carr": "node build/index test/ComplexArrays --parse-tree --tokens",
+        "test:cbin": "node build/index test/ConvertToBin --parse-tree --tokens",
+        "test:pong": "node build/index test/Pong --parse-tree --tokens",
+        "test:seven": "node build/index test/Seven --parse-tree --tokens",
+        "test:square": "node build/index test/Square --parse-tree --tokens"
     },
     "dependencies": {
         "sha3": "^2.1.4"
@@ -19,6 +25,7 @@
         "@typescript-eslint/parser": "^5.39.0",
         "eslint": "^8.24.0",
         "eslint-config-prettier": "^8.5.0",
+        "npm-run-all": "^4.1.5",
         "prettier": "^2.4.1",
         "typescript": "^4.8.4"
     }
